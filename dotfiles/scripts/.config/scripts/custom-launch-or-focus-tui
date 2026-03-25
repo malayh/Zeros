@@ -1,0 +1,6 @@
+#!/bin/bash
+
+APP_ID="org.zeros.$(basename $1)"
+LAUNCH_COMMAND="custom-launch-tui $@"
+
+exec custom-launch-or-focus "$APP_ID" "$LAUNCH_COMMAND"

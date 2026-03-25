@@ -1,0 +1,26 @@
+#!/bin/bash
+
+WALLPAPER_PATH="$1"
+
+getabsolutePath() {
+    echo "$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+}
+
+
+if [ -z "$WALLPAPER_PATH" ]; then
+    echo "Usage: custom-set-wallpaper /path/to/new/wallpaper.jpg"
+    exit 1
+fi
+
+if [ ! -f "$WALLPAPER_PATH" ]; then
+    echo "Error: File '$WALLPAPER_PATH' does not exist."
+    exit 1
+fi
+
+NEW_WALLPAPER_PATH=$(getabsolutePath "$WALLPAPER_PATH")
+rm -f "$HOME/.config/zeros/theme/currentwallpaper.png"
+
+magick "$NEW_WALLPAPER_PATH" "$HOME/.config/zeros/theme/currentwallpaper.png"
+
+pkill -x swaybg
+setsid uwsm-app -- swaybg -i ~/.config/zeros/theme/currentwallpaper.png -m fill >/dev/null 2>&1 &

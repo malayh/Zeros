@@ -1,0 +1,17 @@
+#!/bin/bash
+
+action=$1
+
+case $action in
+    "open")
+        hyprctl reload
+        ;;
+    "close")
+        # Enable the internal display
+        hyprctl keyword monitor "eDP-1,disable"
+        ;;
+    *)
+        echo "Invalid action. Use 'open' or 'close'."
+        ;;
+esac
+

@@ -1,0 +1,4 @@
+#!/bin/bash
+
+rfkill unblock bluetooth
+exec custom-launch-or-focus-tui bluetui
