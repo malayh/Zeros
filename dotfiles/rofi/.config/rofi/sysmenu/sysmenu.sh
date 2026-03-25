@@ -5,10 +5,9 @@ source ~/.config/rofi/common/generic.sh
 
 opt_install="󰏔 Install software"
 opt_screenshot="󰄀 Take screenshot"
-opt_screenrecord=" Record screen"
 opt_toggle_gpu="󰍹 Toggle GPU mode"
 opt_color_picker=" Color picker"
-main_menu="$opt_install\n$opt_screenshot\n$opt_screenrecord\n$opt_toggle_gpu\n$opt_color_picker"
+main_menu="$opt_install\n$opt_screenshot\n$opt_toggle_gpu\n$opt_color_picker"
 chosen=$(_runrofimenu "$main_menu" "System Menu" "󰍹")
 
 case $chosen in

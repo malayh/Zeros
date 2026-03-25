@@ -39,13 +39,12 @@ core_dependencies=(
     polkit-gnome
     
     # network, bluetooth
-    # impala                        
-    # network-manager-applet
+    impala                        
     bluetui
 
-    # # audio
-    # wiremix
-    # pamixer
+    # audio
+    wiremix
+    pamixer
 
     # fonts
     ttf-jetbrains-mono-nerd
@@ -53,6 +52,8 @@ core_dependencies=(
 
     # theme
     bibata-cursor-theme
+    swaybg
+    imagemagick
     # nwg-look
     # qt5-wayland
     # kvantum-qt5
@@ -63,12 +64,11 @@ core_dependencies=(
     # supergfxctl
 
     # screenshot
-    # slurp
-    # grim
-    # wayfreeze
-    # satty
-    # hyprpicker
-    # gpu-screen-recorder
+    slurp
+    grim
+    wayfreeze
+    satty
+    hyprpicker
 
     # monitor control
     # ddcutil
