@@ -46,11 +46,9 @@ core_dependencies=(
     wiremix
     pamixer
 
-    # fonts
+    # theme
     ttf-jetbrains-mono-nerd
     ttf-cascadia-mono-nerd
-
-    # theme
     bibata-cursor-theme
     swaybg
     imagemagick
