@@ -54,9 +54,11 @@ core_dependencies=(
     bibata-cursor-theme
     swaybg
     imagemagick
-    # nwg-look
-    # qt5-wayland
-    # kvantum-qt5
+    nwg-look 
+    qt5ct 
+    qt6ct 
+    kvantum 
+    kvantum-qt5
 
     # asus rog/tuf specific
     # asusctl
