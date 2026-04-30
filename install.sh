@@ -25,6 +25,10 @@ core_dependencies=(
     mako
     power-profiles-daemon
 
+    # display manager
+    sddm
+    sddm-astronaut-theme
+
     # apps
     ghostty
     timeshift
@@ -79,3 +83,4 @@ core_dependencies=(
 
 _installPackages "${core_dependencies[@]}"
 _stowdotfiles
+_setupSddm
