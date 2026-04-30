@@ -23,6 +23,7 @@ core_dependencies=(
     waybar
     rofi-wayland
     mako
+    power-profiles-daemon
 
     # apps
     ghostty
