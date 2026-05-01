@@ -8,6 +8,7 @@ uptime="`uptime -p | sed -e 's/up //g'`"
 # Options
 shutdown=' Power off'
 suspend=' Suspend'
+hibernate=' Hibernate'
 reboot=' Reboot'
 lock=' Lock'
 
@@ -30,13 +31,16 @@ run_cmd() {
 		elif [[ $1 == '--suspend' ]]; then
 			custom-lock-screen
 			systemctl suspend
+		elif [[ $1 == '--hibernate' ]]; then
+			custom-lock-screen
+			systemctl hibernate
 		fi
 	else
 		exit 0
 	fi
 }
 
-options=$(echo -e "$lock\n$suspend\n$reboot\n$shutdown")
+options=$(echo -e "$lock\n$suspend\n$hibernate\n$reboot\n$shutdown")
 chosen="$(_runrofimenu "$options" "Power Menu" "")"
 
 case ${chosen} in
@@ -49,6 +53,9 @@ case ${chosen} in
 	$suspend)
 		run_cmd --suspend
 		;;
+    $hibernate)
+		run_cmd --hibernate
+        ;;
     $lock)
 		run_cmd --lock
         ;;

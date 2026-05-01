@@ -1,6 +1,9 @@
 #!/bin/bash
 source lib.sh
 
+: "${CREATE_OR_UPDATE_SWAP:=1}"
+export CREATE_OR_UPDATE_SWAP
+
 core_dependencies=(
     #general tools
     stow
@@ -91,3 +94,4 @@ _installPackages "${core_dependencies[@]}"
 _stowdotfiles
 _setupSddm
 _enableScreenSharing
+_setupHibernation
