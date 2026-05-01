@@ -55,3 +55,14 @@ _setupSddm() {
 
     sudo systemctl enable sddm.service
 }
+
+_enableScreenSharing() {
+    local units=(pipewire.socket pipewire-pulse.socket wireplumber.service)
+    for unit in "${units[@]}"; do
+        if systemctl --user is-active --quiet "${unit}"; then
+            echo ":: ${unit} is already active."
+            continue
+        fi
+        systemctl --user enable --now "${unit}"
+    done
+}

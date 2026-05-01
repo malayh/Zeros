@@ -75,6 +75,12 @@ core_dependencies=(
     satty
     hyprpicker
 
+    # screen sharing (PipeWire pipeline for xdg-desktop-portal ScreenCast)
+    pipewire
+    wireplumber
+    pipewire-pulse
+    libpipewire
+
     # monitor control
     # ddcutil
     
@@ -84,3 +90,4 @@ core_dependencies=(
 _installPackages "${core_dependencies[@]}"
 _stowdotfiles
 _setupSddm
+_enableScreenSharing
