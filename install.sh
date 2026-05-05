@@ -25,7 +25,7 @@ core_dependencies=(
     xdg-terminal-exec
     waybar
     rofi-wayland
-    mako
+    swaync
     power-profiles-daemon
 
     # display manager
