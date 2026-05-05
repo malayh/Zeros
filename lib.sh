@@ -37,6 +37,48 @@ _enableScreenSharing() {
     done
 }
 
+_installSddmTheme() {
+    local repo_root theme_src theme_dst conf_src conf_dst bg_dir wallpaper
+    repo_root=$(pwd)
+    theme_src="${repo_root}/sddm/themes/zeros"
+    theme_dst="/usr/share/sddm/themes/zeros"
+    conf_src="${repo_root}/sddm/sddm.conf.d/zeros.conf"
+    conf_dst="/etc/sddm.conf.d/zeros.conf"
+    bg_dir="${theme_dst}/backgrounds"
+    wallpaper="${HOME}/.config/zeros/theme/currentwallpaper.png"
+
+    if [[ ! -f "${theme_src}/Main.qml" ]]; then
+        echo ":: SDDM theme source missing at ${theme_src}, skipping."
+        return 0
+    fi
+
+    if [[ -f "${theme_dst}/Main.qml" \
+        && -f "${theme_dst}/metadata.desktop" \
+        && -d "${bg_dir}" \
+        && -f "${conf_dst}" ]]; then
+        echo ":: SDDM zeros theme already installed, skipping."
+        return 0
+    fi
+
+    sudo install -d -m 755 "${theme_dst}"
+    sudo install -m 644 "${theme_src}/Main.qml" "${theme_dst}/Main.qml"
+    sudo install -m 644 "${theme_src}/metadata.desktop" "${theme_dst}/metadata.desktop"
+
+    # User-owned backgrounds dir so wallpaper sync works without sudo.
+    # 0755 keeps the file readable by the sddm greeter user.
+    sudo install -d -m 755 -o "${USER}" -g "${USER}" "${bg_dir}"
+
+    sudo install -d -m 755 /etc/sddm.conf.d
+    sudo install -m 644 "${conf_src}" "${conf_dst}"
+
+    if [[ -f "${wallpaper}" ]]; then
+        install -m 644 "${wallpaper}" "${bg_dir}/current.png"
+        echo ":: seeded SDDM background from ${wallpaper}."
+    else
+        echo ":: no wallpaper at ${wallpaper} yet; SDDM will show black until one is set."
+    fi
+}
+
 _setupHibernation() {
     local swapfile="/swapfile"
     local manage_swap="${CREATE_OR_UPDATE_SWAP:-1}"

@@ -24,3 +24,8 @@ magick "$NEW_WALLPAPER_PATH" "$HOME/.config/zeros/theme/currentwallpaper.png"
 
 pkill -x swaybg
 setsid uwsm-app -- swaybg -i ~/.config/zeros/theme/currentwallpaper.png -m fill >/dev/null 2>&1 &
+
+SDDM_BG_DIR="/usr/share/sddm/themes/zeros/backgrounds"
+if [ -w "$SDDM_BG_DIR" ]; then
+    cp "$HOME/.config/zeros/theme/currentwallpaper.png" "$SDDM_BG_DIR/current.png"
+fi

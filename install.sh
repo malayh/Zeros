@@ -91,5 +91,6 @@ core_dependencies=(
 
 _installPackages "${core_dependencies[@]}"
 _stowdotfiles
+_installSddmTheme
 _enableScreenSharing
 _setupHibernation
