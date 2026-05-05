@@ -1,9 +1,9 @@
 /* Palette mirrored from dotfiles/rofi/.config/rofi/colors/catppuccin.rasi.
    Surface tokens use rgba so Hyprland's blur can show through, matching
    rofi's `transparency: real` + `backdrop: blur(...)` look. */
-@define-color background          rgba(30, 29, 47, 0.95);
+@define-color background          rgba(30, 29, 47, 0.85);
 @define-color background-solid    #1E1D2F;
-@define-color background-alt      rgba(40, 40, 57, 0.95);
+@define-color background-alt      rgba(40, 40, 57, 0.85);
 @define-color background-alt-solid #282839;
 @define-color foreground          #D9E0EE;
 @define-color selected            #7AA2F7;
@@ -109,7 +109,7 @@
 /* === Control center ===================================================== */
 
 .control-center {
-  background: @background;
+  background: rgba(30, 29, 47, 0.95);
   border: 1px solid @background-alt-solid;
   border-radius: 12px;
   padding: 16px;
