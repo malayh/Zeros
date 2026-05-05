@@ -30,7 +30,6 @@ core_dependencies=(
 
     # display manager
     sddm
-    sddm-astronaut-theme
 
     # apps
     ghostty
@@ -92,6 +91,5 @@ core_dependencies=(
 
 _installPackages "${core_dependencies[@]}"
 _stowdotfiles
-_setupSddm
 _enableScreenSharing
 _setupHibernation
