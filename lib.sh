@@ -38,7 +38,7 @@ _enableScreenSharing() {
 }
 
 _installSddmTheme() {
-    local repo_root theme_src theme_dst conf_src conf_dst bg_dir wallpaper
+    local repo_root theme_src theme_dst conf_src conf_dst bg_dir wallpaper main_conf
     repo_root=$(pwd)
     theme_src="${repo_root}/sddm/themes/zeros"
     theme_dst="/usr/share/sddm/themes/zeros"
@@ -46,16 +46,23 @@ _installSddmTheme() {
     conf_dst="/etc/sddm.conf.d/zeros.conf"
     bg_dir="${theme_dst}/backgrounds"
     wallpaper="${HOME}/.config/zeros/theme/currentwallpaper.png"
+    main_conf="/etc/sddm.conf"
 
     if [[ ! -f "${theme_src}/Main.qml" ]]; then
         echo ":: SDDM theme source missing at ${theme_src}, skipping."
         return 0
     fi
 
+    # Idempotency: bail out only when every artifact this function manages is
+    # already in place, including /etc/sddm.conf (which overrides /etc/sddm.conf.d
+    # in this SDDM build, so it MUST point at zeros).
     if [[ -f "${theme_dst}/Main.qml" \
         && -f "${theme_dst}/metadata.desktop" \
         && -d "${bg_dir}" \
-        && -f "${conf_dst}" ]]; then
+        && -f "${conf_dst}" \
+        && -f "${main_conf}" ]] \
+        && grep -qE '^\s*Current\s*=\s*zeros\s*$' "${main_conf}" \
+        && ! grep -qE '^\s*(GreeterEnvironment|InputMethod)\s*=\s*\S' "${main_conf}"; then
         echo ":: SDDM zeros theme already installed, skipping."
         return 0
     fi
@@ -70,6 +77,28 @@ _installSddmTheme() {
 
     sudo install -d -m 755 /etc/sddm.conf.d
     sudo install -m 644 "${conf_src}" "${conf_dst}"
+
+    # /etc/sddm.conf is loaded after /etc/sddm.conf.d/ and wins on conflict, so
+    # the drop-in alone is not enough to switch themes. Patch it directly, and
+    # clear any silent-specific env vars (the qtvirtualkeyboard plugin is
+    # incompatible with Qt 6.11+ and makes SDDM fall back to its embedded theme).
+    if [[ -f "${main_conf}" ]]; then
+        if grep -qE '^\s*Current\s*=' "${main_conf}"; then
+            sudo sed -i -E 's|^\s*Current\s*=.*|Current=zeros|' "${main_conf}"
+        else
+            if grep -qE '^\s*\[Theme\]\s*$' "${main_conf}"; then
+                sudo sed -i -E '/^\s*\[Theme\]\s*$/a Current=zeros' "${main_conf}"
+            else
+                printf '\n[Theme]\nCurrent=zeros\n' | sudo tee -a "${main_conf}" >/dev/null
+            fi
+        fi
+        sudo sed -i -E 's|^\s*GreeterEnvironment\s*=.*|GreeterEnvironment=|' "${main_conf}"
+        sudo sed -i -E 's|^\s*InputMethod\s*=.*|InputMethod=|' "${main_conf}"
+    else
+        printf '[Theme]\nCurrent=zeros\n' | sudo tee "${main_conf}" >/dev/null
+        sudo chmod 644 "${main_conf}"
+    fi
+    echo ":: pointed ${main_conf} at the zeros theme and cleared legacy greeter env."
 
     if [[ -f "${wallpaper}" ]]; then
         install -m 644 "${wallpaper}" "${bg_dir}/current.png"
