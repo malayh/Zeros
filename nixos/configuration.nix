@@ -71,9 +71,17 @@ in
   services.printing.enable = true;
 
   # --- Graphical session: Hyprland + SDDM ---
+  # withUWSM ships a `hyprland-uwsm.desktop` wayland-session entry alongside the
+  # plain "Hyprland" one — SDDM auto-discovers it. UWSM wraps the compositor in
+  # systemd units and raises graphical-session.target, which is what user
+  # services like udiskie / polkit-gnome (see home.nix) are bound to. The
+  # autostart.conf `exec-once = uwsm-app -- ...` wrappers depend on this being
+  # on. At the SDDM login screen you must pick "Hyprland (UWSM)", not plain
+  # "Hyprland" — otherwise none of that wiring activates.
   programs.hyprland = {
     enable = true;
     xwayland.enable = true;
+    withUWSM = true;
   };
 
   services.displayManager.sddm = {
@@ -113,6 +121,11 @@ in
 
   # --- Docker (daemon + CLI + compose v2 plugin). User must be in `docker` group. ---
   virtualisation.docker.enable = true;
+
+  # --- Removable media auto-mount. udisks2 is the D-Bus side (system service);
+  # udiskie runs in the user session and is started by graphical-session.target
+  # (see home.nix). Mounts land at /run/media/$USER/<label>. ---
+  services.udisks2.enable = true;
 
   # FHS-style /bin and /usr/bin via a fuse mount, so scripts with hardcoded
   # shebangs like #!/bin/bash work without patching.

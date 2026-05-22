@@ -89,6 +89,11 @@
 
     # auth / secrets client lib
     libsecret
+
+    # removable-media auto-mount daemon (user-session side; pairs with
+    # services.udisks2 in configuration.nix). Started by the systemd user unit
+    # below, which UWSM hooks onto graphical-session.target.
+    udiskie
   ];
 
   # Polkit authentication agent (replaces the Arch autostart.conf exec-once line).
@@ -101,6 +106,24 @@
     Service = {
       Type = "simple";
       ExecStart = "${pkgs.polkit_gnome}/libexec/polkit-gnome-authentication-agent-1";
+      Restart = "on-failure";
+    };
+  };
+
+  # USB / removable-media auto-mount. Pairs with services.udisks2 in
+  # configuration.nix. graphical-session.target is raised by UWSM at session
+  # start — bare Hyprland would NOT raise it, so this unit only fires under
+  # the "Hyprland (UWSM)" SDDM session.
+  systemd.user.services.udiskie = {
+    Unit = {
+      Description = "udiskie removable-media auto-mounter";
+      PartOf = [ "graphical-session.target" ];
+      After = [ "graphical-session.target" ];
+    };
+    Install.WantedBy = [ "graphical-session.target" ];
+    Service = {
+      Type = "simple";
+      ExecStart = "${pkgs.udiskie}/bin/udiskie --automount --notify --no-tray";
       Restart = "on-failure";
     };
   };
