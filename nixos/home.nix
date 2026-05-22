@@ -59,10 +59,14 @@
     ghostty
     kdePackages.dolphin
 
-    # Qt / GTK theming
+    # GTK / Qt theme config GUIs.  Themes are NOT installed declaratively here —
+    # use these tools (or `nix-env`/add packages later) to pick one at runtime.
+    #   nwg-look          -> GTK theme/icon/cursor/font picker
+    #   qt5ct / qt6ct     -> Qt5/Qt6 platform-theme picker (style + palette + icons)
+    #   kvantummanager    -> Kvantum SVG-style picker (comes with qtstyleplugin-kvantum)
     nwg-look
-    kdePackages.qt6ct
     libsForQt5.qt5ct
+    kdePackages.qt6ct
     libsForQt5.qtstyleplugin-kvantum
     kdePackages.qtstyleplugin-kvantum
 

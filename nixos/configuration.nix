@@ -116,12 +116,14 @@ in
   ];
 
   # --- Env vars seen by the SDDM-launched session ---
+  # QT_QPA_PLATFORMTHEME=qt6ct -> Qt5 *and* Qt6 apps load qt5ct/qt6ct as their
+  # platform theme (the qt6ct plugin handles both via the same env var name on
+  # newer builds).  Pick a Kvantum SVG style or any Qt style via the GUIs.
   environment.sessionVariables = {
-    QT_QPA_PLATFORMTHEME = "qt6ct";
-    QT_STYLE_OVERRIDE    = "kvantum";
-    XDG_CURRENT_DESKTOP  = "Hyprland";
-    XDG_SESSION_TYPE     = "wayland";
-    NIXOS_OZONE_WL       = "1";
+    XDG_CURRENT_DESKTOP   = "Hyprland";
+    XDG_SESSION_TYPE      = "wayland";
+    NIXOS_OZONE_WL        = "1";
+    QT_QPA_PLATFORMTHEME  = "qt6ct";
   };
 
   # --- User ---
