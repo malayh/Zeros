@@ -58,6 +58,14 @@
     # apps
     ghostty
     nautilus
+    gnome-boxes
+    libreoffice
+    chromium
+    brave
+    obsidian
+    localsend
+    qbittorrent
+    vlc
 
     # GTK / Qt theme config GUIs.  Themes are NOT installed declaratively here —
     # use these tools (or `nix-env`/add packages later) to pick one at runtime.

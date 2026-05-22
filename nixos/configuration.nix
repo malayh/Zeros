@@ -111,6 +111,9 @@ in
   services.power-profiles-daemon.enable = true;
   hardware.i2c.enable = true;
 
+  # --- Docker (daemon + CLI + compose v2 plugin). User must be in `docker` group. ---
+  virtualisation.docker.enable = true;
+
   # FHS-style /bin and /usr/bin via a fuse mount, so scripts with hardcoded
   # shebangs like #!/bin/bash work without patching.
   services.envfs.enable = true;
@@ -138,7 +141,7 @@ in
   users.users.malay = {
     isNormalUser = true;
     description = "Malay";
-    extraGroups = [ "networkmanager" "wheel" "video" "i2c" ];
+    extraGroups = [ "networkmanager" "wheel" "video" "i2c" "docker" ];
     packages = with pkgs; [ ];
   };
 
