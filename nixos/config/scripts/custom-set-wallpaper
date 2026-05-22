@@ -1,0 +1,32 @@
+#!/bin/bash
+
+WALLPAPER_PATH="$1"
+
+getabsolutePath() {
+    echo "$(cd "$(dirname "$1")"; pwd)/$(basename "$1")"
+}
+
+
+if [ -z "$WALLPAPER_PATH" ]; then
+    echo "Usage: custom-set-wallpaper /path/to/new/wallpaper.jpg"
+    exit 1
+fi
+
+if [ ! -f "$WALLPAPER_PATH" ]; then
+    echo "Error: File '$WALLPAPER_PATH' does not exist."
+    exit 1
+fi
+
+NEW_WALLPAPER_PATH=$(getabsolutePath "$WALLPAPER_PATH")
+mkdir -p "$HOME/.config/zeros/theme"
+rm -f "$HOME/.config/zeros/theme/currentwallpaper.png"
+
+magick "$NEW_WALLPAPER_PATH" "$HOME/.config/zeros/theme/currentwallpaper.png"
+
+pkill -x swaybg
+setsid swaybg -i ~/.config/zeros/theme/currentwallpaper.png -m fill >/dev/null 2>&1 &
+
+SDDM_BG_DIR="/var/lib/sddm-backgrounds"
+if [ -w "$SDDM_BG_DIR" ]; then
+    cp "$HOME/.config/zeros/theme/currentwallpaper.png" "$SDDM_BG_DIR/current.png"
+fi

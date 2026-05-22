@@ -1,0 +1,10 @@
+[SddmGreeterTheme]
+Name=Zeros
+Description=Zeros greeter, mirrors the Hyprlock Style 8 lock screen.
+License=GPL-3.0-or-later
+Type=sddm-theme
+Version=1.0.0
+Theme-Id=zeros
+Theme-API=2.0
+QtVersion=6
+MainScript=Main.qml
