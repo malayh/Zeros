@@ -30,17 +30,18 @@ in
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
 
   # Hibernation: 32 GiB swapfile sized for hibernation-to-disk.
-  # resumeDevice is taken from the root fs (where /var/lib/swapfile lives), so
-  # this stays machine-agnostic — hardware-configuration.nix supplies the UUID.
-  # After first activation: compute resume_offset via
-  #   sudo btrfs inspect-internal map-swapfile -r /var/lib/swapfile   # btrfs
-  #   sudo filefrag -v /var/lib/swapfile | awk '$1=="0:" {print substr($4,1,length($4)-2); exit}'  # ext4
-  # then uncomment the kernelParams line below and rebuild.
+  # resumeDevice is the root fs (where /var/lib/swapfile lives).  resume_offset
+  # is the byte-position of the swapfile within that fs and is machine-local
+  # (it depends on where the kernel placed the file).  install.sh recomputes
+  # it via `filefrag` on every rebuild and writes /etc/nixos/resume-offset.
+  # The conditional keeps a first-boot rebuild (before the swapfile exists)
+  # from breaking: no file -> no kernel param -> system still boots fine.
   swapDevices = [
     { device = "/var/lib/swapfile"; size = 32 * 1024; }
   ];
   boot.resumeDevice = config.fileSystems."/".device;
-  # boot.kernelParams = [ "resume_offset=<fill-after-first-boot>" ];
+  boot.kernelParams = lib.optional (builtins.pathExists /etc/nixos/resume-offset)
+    "resume_offset=${builtins.readFile /etc/nixos/resume-offset}";
 
   # --- Networking ---
   networking.hostName = "nixos";

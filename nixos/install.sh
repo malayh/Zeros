@@ -17,4 +17,16 @@ HW="/etc/nixos/hardware-configuration.nix"
 test -f "$HW" || sudo nixos-generate-config --show-hardware-config \
   | sudo tee "$HW" >/dev/null
 
+# Compute resume_offset for hibernation.  The offset is the physical block of
+# the first extent of /var/lib/swapfile within the root fs; it's machine-local
+# and can change if the swapfile is ever recreated, so we recompute it every
+# run.  Skipped on a brand-new system where the swapfile hasn't been created
+# yet — the next rebuild creates it, and the following install.sh writes the
+# offset.
+if [[ -f /var/lib/swapfile ]]; then
+  OFFSET=$(sudo filefrag -v /var/lib/swapfile \
+    | awk '$1=="0:" {sub(/\.\.$/,"",$4); print $4; exit}')
+  printf '%s' "$OFFSET" | sudo tee /etc/nixos/resume-offset >/dev/null
+fi
+
 sudo nixos-rebuild switch --flake ".#nixos" --impure
