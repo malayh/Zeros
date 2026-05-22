@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
 source ~/.config/rofi/common/generic.sh
 

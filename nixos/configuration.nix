@@ -103,6 +103,10 @@ in
   services.power-profiles-daemon.enable = true;
   hardware.i2c.enable = true;
 
+  # FHS-style /bin and /usr/bin via a fuse mount, so scripts with hardcoded
+  # shebangs like #!/bin/bash work without patching.
+  services.envfs.enable = true;
+
   # --- Fonts ---
   fonts.packages = with pkgs; [
     nerd-fonts.jetbrains-mono
