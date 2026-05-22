@@ -1,4 +1,0 @@
-#!/bin/bash
-
-rfkill unblock wifi
-custom-launch-tui bash -c 'nmcli device wifi rescan 2>/dev/null; nmcli device wifi list; echo; echo "Connect: nmcli device wifi connect <SSID> password <PASS>"; exec bash'

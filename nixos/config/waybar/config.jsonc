@@ -60,7 +60,7 @@
     "tooltip-format-disconnected": "Disconnected",
     "interval": 3,
     "spacing": 1,
-    "on-click": "custom-launch-wifi"
+    "on-click": "custom-launch-tui nmtui"
   },
   "battery": {
     "format": "{capacity}% {icon}",
