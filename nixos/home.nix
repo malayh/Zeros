@@ -47,6 +47,7 @@
     # audio / network / bt TUIs
     pamixer
     wiremix
+    impala
     bluetui
     util-linux  # rfkill lives here
 
