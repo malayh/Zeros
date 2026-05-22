@@ -5,7 +5,7 @@
   "spacing": 0,
   "height": 26,
   "modules-left": ["hyprland/workspaces"],
-  "modules-center": ["clock"],
+  "modules-center": ["custom/clock"],
   "modules-right": [
     "group/tray-expander",
     "bluetooth",
@@ -44,8 +44,13 @@
     "format": "󰍛",
     "on-click": "custom-launch-or-focus-tui btop --force-utf"
   },
-  "clock": {
-    "format": "{:L%A, %d %B, %-I:%M %p}",
+  // Waybar's built-in clock uses C++20 chrono specs, which lack unpadded-hour
+  // (`%-I`) and space-padded-hour (`%l`).  Shelling out to GNU `date` gives us
+  // real strftime so we can produce "Friday, 22 May, 8:43 PM" without a
+  // leading zero on the hour.
+  "custom/clock": {
+    "exec": "date '+%A, %-d %B, %-I:%M %p'",
+    "interval": 30,
     "tooltip": false
   },
   "network": {

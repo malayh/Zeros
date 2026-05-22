@@ -65,7 +65,8 @@ tooltip {
   font-size: 10px;
 }
 
-#clock {
+#clock,
+#custom-clock {
   margin-left: 8.75px;
 }
 
