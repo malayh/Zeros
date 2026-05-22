@@ -38,7 +38,9 @@ in
   # --- Networking ---
   networking.hostName = "nixos";
   networking.networkmanager.enable = true;
-  networking.networkmanager.wifi.backend = "iwd";
+  # Carve wifi out of NM so iwd+impala own it exclusively; NM still handles
+  # ethernet/VPN/DNS. (NM-as-iwd-backend caused impala to fight NM for the radio.)
+  networking.networkmanager.unmanaged = [ "type:wifi" ];
   networking.wireless.iwd.enable = true;
   time.timeZone = "Asia/Kolkata";
 
@@ -134,9 +136,7 @@ in
     packages = with pkgs; [ ];
   };
 
-  # --- System-wide programs / packages ---
   programs.firefox.enable = true;
-
   nixpkgs.config.allowUnfree = true;
   environment.systemPackages = with pkgs; [
     vim
