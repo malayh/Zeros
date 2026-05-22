@@ -25,6 +25,8 @@ in
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
 
   # Hibernation: 32 GiB swapfile sized for hibernation-to-disk.
+  # resumeDevice is taken from the root fs (where /var/lib/swapfile lives), so
+  # this stays machine-agnostic — hardware-configuration.nix supplies the UUID.
   # After first activation: compute resume_offset via
   #   sudo btrfs inspect-internal map-swapfile -r /var/lib/swapfile   # btrfs
   #   sudo filefrag -v /var/lib/swapfile | awk '$1=="0:" {print substr($4,1,length($4)-2); exit}'  # ext4
@@ -32,7 +34,7 @@ in
   swapDevices = [
     { device = "/var/lib/swapfile"; size = 32 * 1024; }
   ];
-  boot.resumeDevice = "/dev/disk/by-uuid/f050387e-08b6-4304-a0eb-e3b506f408c2";
+  boot.resumeDevice = config.fileSystems."/".device;
   # boot.kernelParams = [ "resume_offset=<fill-after-first-boot>" ];
 
   # --- Networking ---
