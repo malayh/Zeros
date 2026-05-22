@@ -45,8 +45,7 @@
     "on-click": "custom-launch-or-focus-tui btop --force-utf"
   },
   "clock": {
-    "format": "{:L%A %I:%M %p}",
-    "format-alt": "{:L%d %B W%V %Y}",
+    "format": "{:L%A, %d %B, %-I:%M %p}",
     "tooltip": false
   },
   "network": {

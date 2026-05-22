@@ -154,5 +154,15 @@ in
   ];
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+
+  # Auto-GC: drop store paths/generations older than 7 days.  Runs daily so the
+  # /boot ESP doesn't fill up with stale systemd-boot entries either (the boot
+  # loader's generation list mirrors what's reachable in the nix store).
+  nix.gc = {
+    automatic = true;
+    dates = "daily";
+    options = "--delete-older-than 7d";
+  };
+
   system.stateVersion = "25.11";
 }

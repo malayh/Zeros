@@ -7,7 +7,8 @@ opt_install="󰏔 Install software"
 opt_screenshot="󰄀 Take screenshot"
 opt_toggle_gpu="󰍹 Toggle GPU mode"
 opt_color_picker=" Color picker"
-main_menu="$opt_install\n$opt_screenshot\n$opt_toggle_gpu\n$opt_color_picker"
+opt_power_menu=" Power profile"
+main_menu="$opt_install\n$opt_screenshot\n$opt_toggle_gpu\n$opt_color_picker\n$opt_power_menu"
 chosen=$(_runrofimenu "$main_menu" "System Menu" "󰍹")
 
 case $chosen in
@@ -25,6 +26,9 @@ case $chosen in
         ;;
     $opt_color_picker)
         sleep 0.5 && hyprpicker -a
+        ;;
+    $opt_power_menu)
+        $HOME/.config/rofi/powerprofile/powerprofile.sh
         ;;
 esac
 
