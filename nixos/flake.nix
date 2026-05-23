@@ -28,6 +28,7 @@
         modules = [
           ./configuration.nix
           ./devices/${device}/${device}.nix
+          ./app-config.nix
           home-manager.nixosModules.home-manager
           {
             home-manager = {

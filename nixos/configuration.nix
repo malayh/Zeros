@@ -99,6 +99,7 @@ in
   virtualisation.docker.enable = true;
   services.udisks2.enable = true;
   services.envfs.enable = true;
+  programs.nix-ld.enable = true;
 
   # --- Fonts ---
   fonts.packages = with pkgs; [
