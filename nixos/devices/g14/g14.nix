@@ -25,19 +25,20 @@
   boot.kernelParams = lib.optional (builtins.pathExists /etc/nixos/resume-offset)
     "resume_offset=${builtins.readFile /etc/nixos/resume-offset}";
 
-  # MT7922 combo Wi-Fi+BT chip races at boot: mt7921e finishes loading Wi-Fi
-  # firmware *after* btusb has already attempted (and failed with -EINVAL) the
-  # wmt func ctrl handshake, leaving hci0 DOWN with BD address 00:00:00:00:00:00.
-  # Reloading btusb once mt7921e is fully up makes the BT side initialize
-  # cleanly; bluetoothd auto-picks-up the re-appearing hci0 via netlink.
-  systemd.services.btusb-reload = {
-    description = "Reload btusb to work around MT7922 BT firmware-load race";
-    after = [ "bluetooth.service" ];
-    wantedBy = [ "multi-user.target" ];
-    serviceConfig.Type = "oneshot";
-    script = ''
-      ${pkgs.kmod}/bin/modprobe -r btusb || true
-      ${pkgs.kmod}/bin/modprobe btusb
-    '';
-  };
+  # MT7922 combo Wi-Fi+BT chip won't initialize the BT side at boot: the BT
+  # vendor `wmt func ctrl` command fails with -EINVAL ("Failed to send wmt
+  # func ctrl (-22)" in dmesg), leaving hci0 DOWN with BD address
+  # 00:00:00:00:00:00.  Two module quirks are responsible:
+  #
+  #   - mt7921e ASPM (PCIe Active State Power Management) puts the chip into
+  #     a low-power state during init that rejects the BT enable command.
+  #   - btusb USB autosuspend then prevents BT from recovering after the
+  #     fact (also breaks BT across system suspend/resume).
+  #
+  # Both have module parameters that just need turning off.  After this
+  # bluetoothd brings hci0 up on its own — no reload service needed.
+  boot.extraModprobeConfig = ''
+    options mt7921e disable_aspm=1
+    options btusb enable_autosuspend=0
+  '';
 }

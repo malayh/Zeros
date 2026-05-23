@@ -24,6 +24,19 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
 
+  # Generic AMD-laptop USB/PCIe hardening:
+  #  - pcie_aspm=off: PCIe Active State Power Management is buggy on many
+  #    AMD Ryzen laptops, manifesting as random USB enumeration failures,
+  #    Wi-Fi drops, and SD-card glitches.  Cost is a small steady-state
+  #    power increase; benefit is markedly fewer "device descriptor read,
+  #    error -71" surprises at boot when peripherals/hubs are plugged in.
+  #  - usbcore.autosuspend=-1: disables USB autosuspend kernel-wide so
+  #    hubs and HID devices don't get suspended out from under us.
+  boot.kernelParams = [
+    "pcie_aspm=off"
+    "usbcore.autosuspend=-1"
+  ];
+
   # --- Networking ---
   networking.networkmanager.enable = true;
   time.timeZone = "Asia/Kolkata";
@@ -43,21 +56,12 @@ in
     jack.enable = true;
   };
 
-  # --- Input / locale ---
   services.xserver.xkb = {
     layout = "us";
     variant = "";
   };
   services.printing.enable = true;
 
-  # --- Graphical session: Hyprland + SDDM ---
-  # withUWSM ships a `hyprland-uwsm.desktop` wayland-session entry alongside the
-  # plain "Hyprland" one — SDDM auto-discovers it. UWSM wraps the compositor in
-  # systemd units and raises graphical-session.target, which is what user
-  # services like udiskie / polkit-gnome (see home.nix) are bound to. The
-  # autostart.conf `exec-once = uwsm-app -- ...` wrappers depend on this being
-  # on. At the SDDM login screen you must pick "Hyprland (UWSM)", not plain
-  # "Hyprland" — otherwise none of that wiring activates.
   programs.hyprland = {
     enable = true;
     xwayland.enable = true;
@@ -83,32 +87,19 @@ in
     "d /var/lib/sddm-backgrounds 0755 malay users -"
   ];
 
-  # --- XDG portals (screen-share, file pickers) ---
   xdg.portal = {
     enable = true;
     extraPortals = [ pkgs.xdg-desktop-portal-gtk ];
     config.common.default = "*";
   };
 
-  # --- Polkit + secrets ---
   security.polkit.enable = true;
   services.gnome.gnome-keyring.enable = true;
   programs.seahorse.enable = true;
-
-  # --- Power / brightness (DDC-CI needs i2c) ---
   services.power-profiles-daemon.enable = true;
   hardware.i2c.enable = true;
-
-  # --- Docker (daemon + CLI + compose v2 plugin). User must be in `docker` group. ---
   virtualisation.docker.enable = true;
-
-  # --- Removable media auto-mount. udisks2 is the D-Bus side (system service);
-  # udiskie runs in the user session and is started by graphical-session.target
-  # (see home.nix). Mounts land at /run/media/$USER/<label>. ---
   services.udisks2.enable = true;
-
-  # FHS-style /bin and /usr/bin via a fuse mount, so scripts with hardcoded
-  # shebangs like #!/bin/bash work without patching.
   services.envfs.enable = true;
 
   # --- Fonts ---
@@ -119,10 +110,6 @@ in
     noto-fonts-color-emoji
   ];
 
-  # --- Env vars seen by the SDDM-launched session ---
-  # QT_QPA_PLATFORMTHEME=qt6ct -> Qt5 *and* Qt6 apps load qt5ct/qt6ct as their
-  # platform theme (the qt6ct plugin handles both via the same env var name on
-  # newer builds).  Pick a Kvantum SVG style or any Qt style via the GUIs.
   environment.sessionVariables = {
     XDG_CURRENT_DESKTOP   = "Hyprland";
     XDG_SESSION_TYPE      = "wayland";
@@ -151,9 +138,6 @@ in
 
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
 
-  # Auto-GC: drop store paths/generations older than 7 days.  Runs daily so the
-  # /boot ESP doesn't fill up with stale systemd-boot entries either (the boot
-  # loader's generation list mirrors what's reachable in the nix store).
   nix.gc = {
     automatic = true;
     dates = "daily";
