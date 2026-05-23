@@ -1,33 +1,45 @@
 #!/usr/bin/env bash
 #
-# Flip the dGPU between Hybrid and Integrated via supergfxd, then reboot.
-# Mode change is applied with `supergfxctl -m` (supergfxd's own setter) so
-# it persists across reboots without touching /etc/supergfxd.conf — that file
-# is a /nix/store symlink on NixOS and would be stomped on the next rebuild.
+# Flip the dGPU between Hybrid and Integrated by editing /etc/supergfxd.conf
+# directly, then rebooting. supergfxd reads the new mode from the config on
+# next boot and applies it from a clean state.
 #
-# supergfxctl + services.supergfxd.enable live in devices/g14/g14.nix; this
-# script assumes both are already in place. If post-resume the GPU flips
-# back to Hybrid (the old arch workaround used a sleep hook + delay-start
-# drop-in for this), wire those declaratively in g14.nix rather than here.
+# Why not `supergfxctl -m <mode>`? With logind active, the daemon's default
+# action is WaitLogout: it queues the change and waits for the session to end
+# before persisting. systemctl reboot kills supergfxd before it writes, so
+# the change never lands on disk and boot falls back to Hybrid.
+#
+# Why sed works on NixOS: /etc/supergfxd.conf is only a /nix/store symlink
+# when services.supergfxd.settings is set. With settings = null (our setup
+# in devices/g14/g14.nix), the daemon creates the file itself as a regular
+# writable file — sed-editing it is fine and survives rebuild.
+#
+# The post-resume Vfio bounce and the supergfxd ExecStartPre delay live in
+# devices/g14/g14.nix (the arch script used to install both imperatively).
+
 source ~/.config/rofi/common/generic.sh
 
 yes=' Yes'
 no='󰜺 Cancel'
 yesno_options="$yes\n$no"
 
+set_mode() {
+    sudo /etc/gpu-set-mode "$1"
+}
+
 gpu_mode=$(supergfxctl -g)
 case $gpu_mode in
 "Integrated")
     chosen="$(_runrofimenu "$yesno_options" "Enable dGPU and reboot?" "")"
     if [[ "$chosen" == "$yes" ]]; then
-        supergfxctl -m Hybrid
+        set_mode Hybrid
         systemctl reboot
     fi
     ;;
 "Hybrid")
     chosen="$(_runrofimenu "$yesno_options" "Use only iGPU and reboot?" "")"
     if [[ "$chosen" == "$yes" ]]; then
-        supergfxctl -m Integrated
+        set_mode Integrated
         systemctl reboot
     fi
     ;;
