@@ -68,6 +68,8 @@
     vlc
     just
     zoxide
+    docker-compose
+    uv
 
     # GTK / Qt theme config GUIs.  Themes are NOT installed declaratively here —
     # use these tools (or `nix-env`/add packages later) to pick one at runtime.
@@ -138,7 +140,8 @@
     [ "hypr" "waybar" "rofi" "swaync" "scripts" ]
     (name: { source = repoLink name; });
 
-  programs.bash.enable = true;
+  home.file.".bashrc".source =
+    config.lib.file.mkOutOfStoreSymlink "${flakeRoot}/config/bash/bashrc";
 
   programs.home-manager.enable = true;
 }
