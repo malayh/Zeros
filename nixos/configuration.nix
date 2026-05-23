@@ -95,9 +95,6 @@ in
   services.gnome.gnome-keyring.enable = true;
   programs.seahorse.enable = true;
   services.power-profiles-daemon.enable = true;
-  services.logind.lidSwitch = "ignore";
-  services.logind.lidSwitchExternalPower = "ignore";
-  services.logind.lidSwitchDocked = "ignore";
   hardware.i2c.enable = true;
   virtualisation.docker.enable = true;
   services.udisks2.enable = true;

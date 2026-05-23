@@ -4,7 +4,7 @@
   home.homeDirectory = "/home/malay";
   home.stateVersion  = "25.11";
 
-  # ~/.config/scripts on PATH so the custom-* helpers are findable.
+
   home.sessionPath = [ "$HOME/.config/scripts" ];
 
   home.sessionVariables = {
@@ -133,12 +133,11 @@
     };
   };
 
-  # Live-edit dotfile deployment.
   xdg.configFile = let
     repoLink = name:
       config.lib.file.mkOutOfStoreSymlink "${flakeRoot}/config/${name}";
   in lib.genAttrs
-    [ "hypr" "waybar" "rofi" "swaync" "scripts" ]
+    [ "hypr" "waybar" "rofi" "swaync" "scripts" "uwsm" ]
     (name: { source = repoLink name; });
 
   home.file.".bashrc".source =
