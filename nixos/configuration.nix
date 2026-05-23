@@ -22,20 +22,20 @@ in
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
-  boot.kernelPackages = pkgs.linuxPackages_latest;
-  hardware.enableRedistributableFirmware = true; 
+  
+  # Pinned to 6.6 LTS because linux-6.12.y and 7.0.y stable currently carry
+  # the regression from c411cf1bfde9 / 70d37a8b9229 ("validate WMT event SKB
+  # length before struct access"), which rejects MT7922's short FUNC_CTRL
+  # response with -22 and leaves Bluetooth DOWN. Upstream fix is mainline
+  # e3ac0d9f1a20 but not yet in any stable backport. linux-6.6.y has no
+  # btmtk.c changes from 2026 and works out of the box. Revisit once a
+  # 6.12.y/7.0.y stable release picks up e3ac0d9f1a20.
+  # Trade-off: 6.6 predates the amdxdna (Ryzen AI NPU) driver in 6.10.
+  boot.kernelPackages = pkgs.linuxPackages_6_6;
+  hardware.enableRedistributableFirmware = true;
 
-  # Generic AMD-laptop USB/PCIe hardening:
-  #  - pcie_aspm=off: PCIe Active State Power Management is buggy on many
-  #    AMD Ryzen laptops, manifesting as random USB enumeration failures,
-  #    Wi-Fi drops, and SD-card glitches.  Cost is a small steady-state
-  #    power increase; benefit is markedly fewer "device descriptor read,
-  #    error -71" surprises at boot when peripherals/hubs are plugged in.
-  #  - usbcore.autosuspend=-1: disables USB autosuspend kernel-wide so
-  #    hubs and HID devices don't get suspended out from under us.
   boot.kernelParams = [
-    "pcie_aspm=off"
-    "usbcore.autosuspend=-1"
+    "pcie_aspm=powersave"
   ];
 
   networking.networkmanager.enable = true;
