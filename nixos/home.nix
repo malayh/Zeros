@@ -66,6 +66,8 @@
     localsend
     qbittorrent
     vlc
+    just
+    zoxide
 
     # GTK / Qt theme config GUIs.  Themes are NOT installed declaratively here —
     # use these tools (or `nix-env`/add packages later) to pick one at runtime.
