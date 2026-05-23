@@ -32,11 +32,6 @@
     supergfxctl
   ];
 
-  # Device-local live-edit symlink: ~/.config/rog -> the g14's rog/ dir in the
-  # working tree. Same shape as the shared dotfile bindings in home.nix; lives
-  # here (and not home.nix) because rog/ is g14-specific — other devices won't
-  # have asusd. rog-control-center and asusd write back to these files (fan
-  # curves, aura, anime), so they must point at the live tree, not /nix/store.
   home-manager.users.malay = { config, ... }: {
     xdg.configFile."rog".source =
       config.lib.file.mkOutOfStoreSymlink "${flakeRoot}/devices/g14/rog";
