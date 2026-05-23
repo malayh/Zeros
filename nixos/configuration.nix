@@ -19,10 +19,11 @@ in
   # hibernation offset, device-specific quirks) live under devices/<host>/.
   # The flake selects which devices/* module to merge in per host.
 
-  # --- Boot ---
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
+  boot.kernelPackages = pkgs.linuxPackages_latest;
+  hardware.enableRedistributableFirmware = true; 
 
   # Generic AMD-laptop USB/PCIe hardening:
   #  - pcie_aspm=off: PCIe Active State Power Management is buggy on many
@@ -37,15 +38,12 @@ in
     "usbcore.autosuspend=-1"
   ];
 
-  # --- Networking ---
   networking.networkmanager.enable = true;
   time.timeZone = "Asia/Kolkata";
 
-  # --- Bluetooth ---
   hardware.bluetooth.enable = true;
   hardware.bluetooth.powerOnBoot = true;
 
-  # --- Audio (PipeWire) ---
   services.pulseaudio.enable = false;
   security.rtkit.enable = true;
   services.pipewire = {

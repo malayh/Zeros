@@ -35,6 +35,13 @@ HW="/etc/nixos/hardware-configuration.nix"
 test -f "$HW" || sudo nixos-generate-config --show-hardware-config \
   | sudo tee "$HW" >/dev/null
 
+# Record the flake working-tree path so impure modules can locate the live
+# source tree (used to point user-config symlinks at git-tracked files instead
+# of read-only /nix/store copies — see devices/g14/g14.nix rogConfigLink).
+# Same pattern as resume-offset below: machine-local fact written here, read
+# by the module via builtins.readFile under --impure.
+printf '%s' "$(pwd)" | sudo tee /etc/nixos/flake-root >/dev/null
+
 # Recompute resume_offset for hibernation if this device has a swapfile.
 # The offset is the physical block of the first extent of /var/lib/swapfile
 # within the root fs; it's machine-local and can change if the swapfile is

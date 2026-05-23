@@ -1,10 +1,5 @@
-{ config, lib, pkgs, ... }:
+{ config, lib, pkgs, flakeRoot, ... }:
 {
-  # hardware-configuration.nix lives at /etc/nixos/ (machine-local, generated
-  # by nixos-generate-config during the initial install). Importing it via an
-  # absolute path keeps the flake free of any machine-specific files but
-  # requires `--impure` at build time so Nix is allowed to read outside the
-  # flake source. install.sh passes --impure already.
   imports = [
     /etc/nixos/hardware-configuration.nix
   ];
@@ -25,20 +20,25 @@
   boot.kernelParams = lib.optional (builtins.pathExists /etc/nixos/resume-offset)
     "resume_offset=${builtins.readFile /etc/nixos/resume-offset}";
 
-  # MT7922 combo Wi-Fi+BT chip won't initialize the BT side at boot: the BT
-  # vendor `wmt func ctrl` command fails with -EINVAL ("Failed to send wmt
-  # func ctrl (-22)" in dmesg), leaving hci0 DOWN with BD address
-  # 00:00:00:00:00:00.  Two module quirks are responsible:
-  #
-  #   - mt7921e ASPM (PCIe Active State Power Management) puts the chip into
-  #     a low-power state during init that rejects the BT enable command.
-  #   - btusb USB autosuspend then prevents BT from recovering after the
-  #     fact (also breaks BT across system suspend/resume).
-  #
-  # Both have module parameters that just need turning off.  After this
-  # bluetoothd brings hci0 up on its own — no reload service needed.
-  boot.extraModprobeConfig = ''
-    options mt7921e disable_aspm=1
-    options btusb enable_autosuspend=0
-  '';
+
+  services.asusd = {
+    enable = true;
+    enableUserService = true;
+  };
+  services.supergfxd.enable = true;
+
+  environment.systemPackages = with pkgs; [
+    asusctl 
+    supergfxctl
+  ];
+
+  # Device-local live-edit symlink: ~/.config/rog -> the g14's rog/ dir in the
+  # working tree. Same shape as the shared dotfile bindings in home.nix; lives
+  # here (and not home.nix) because rog/ is g14-specific — other devices won't
+  # have asusd. rog-control-center and asusd write back to these files (fan
+  # curves, aura, anime), so they must point at the live tree, not /nix/store.
+  home-manager.users.malay = { config, ... }: {
+    xdg.configFile."rog".source =
+      config.lib.file.mkOutOfStoreSymlink "${flakeRoot}/devices/g14/rog";
+  };
 }

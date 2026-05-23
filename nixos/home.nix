@@ -1,4 +1,4 @@
-{ config, pkgs, ... }:
+{ config, pkgs, lib, flakeRoot, ... }:
 {
   home.username      = "malay";
   home.homeDirectory = "/home/malay";
@@ -130,14 +130,13 @@
     };
   };
 
-  # Verbatim dotfile deployment: edit the files under ./config/ to change behavior.
-  xdg.configFile = {
-    "hypr".source    = ./config/hypr;
-    "waybar".source  = ./config/waybar;
-    "rofi".source    = ./config/rofi;
-    "swaync".source  = ./config/swaync;
-    "scripts".source = ./config/scripts;
-  };
+  # Live-edit dotfile deployment.
+  xdg.configFile = let
+    repoLink = name:
+      config.lib.file.mkOutOfStoreSymlink "${flakeRoot}/config/${name}";
+  in lib.genAttrs
+    [ "hypr" "waybar" "rofi" "swaync" "scripts" ]
+    (name: { source = repoLink name; });
 
   programs.bash.enable = true;
 
