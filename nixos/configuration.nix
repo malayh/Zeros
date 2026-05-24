@@ -23,22 +23,16 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
   
-  # Pinned to 6.6 LTS because linux-6.12.y and 7.0.y stable currently carry
-  # the regression from c411cf1bfde9 / 70d37a8b9229 ("validate WMT event SKB
-  # length before struct access"), which rejects MT7922's short FUNC_CTRL
-  # response with -22 and leaves Bluetooth DOWN. Upstream fix is mainline
-  # e3ac0d9f1a20 but not yet in any stable backport. linux-6.6.y has no
-  # btmtk.c changes from 2026 and works out of the box. Revisit once a
-  # 6.12.y/7.0.y stable release picks up e3ac0d9f1a20.
-  # Trade-off: 6.6 predates the amdxdna (Ryzen AI NPU) driver in 6.10.
-  boot.kernelPackages = pkgs.linuxPackages_6_6;
+  # 6.12 LTS. MT7922 BT fix e3ac0d9f1a20 ("accept too short WMT FUNC_CTRL
+  # events") landed in 6.12.91, so the regression that kept us on 6.6 is
+  # gone. Moving forward also picks up 18 months of Phoenix amdgpu work
+  # (incl. dcn314 disable_dsc_power_gate) — see nixos/bootisse.md.
+  # Avoid 6.18.y: G14 amdgpu boot crashes reported since 6.18.7.
+  boot.kernelPackages = pkgs.linuxPackages_6_12;
   hardware.enableRedistributableFirmware = true;
 
   boot.kernelParams = [
-    "pcie_aspm=powersave"
-    # Disable AMD PSR — DCN3.14 + PSR causes "frozen-but-running" hangs on
-    # Hyprland (input/compositor dead, kernel alive). See nixos/bootisse.md.
-    "amdgpu.dcdebugmask=0x10"
+    "pcie_aspm.policy=powersave"
   ];
 
   networking.networkmanager.enable = true;
