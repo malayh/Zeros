@@ -36,6 +36,9 @@ in
 
   boot.kernelParams = [
     "pcie_aspm=powersave"
+    # Disable AMD PSR — DCN3.14 + PSR causes "frozen-but-running" hangs on
+    # Hyprland (input/compositor dead, kernel alive). See nixos/bootisse.md.
+    "amdgpu.dcdebugmask=0x10"
   ];
 
   networking.networkmanager.enable = true;
@@ -76,6 +79,14 @@ in
       qtmultimedia
       qtvirtualkeyboard
     ];
+  };
+  services.flatpak.enable = true;
+  systemd.services.flatpak-repo = {
+    wantedBy = [ "multi-user.target" ];
+    path = [ pkgs.flatpak ];
+    script = ''
+      flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+    '';
   };
 
   # Mutable SDDM background dir (the theme reads from here; the theme dir in
@@ -130,8 +141,6 @@ in
     vim
     wget
     git
-    vscode
-    claude-code
     sddm-theme-zeros
   ];
 
