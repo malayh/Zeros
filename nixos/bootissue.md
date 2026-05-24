@@ -57,24 +57,34 @@ Side-effect cleanup needed:
 ### Attempt 3 — fix the no-op pcie_aspm line (correctness, not a freeze fix)
 Replace `"pcie_aspm=powersave"` with `"pcie_aspm.policy=powersave"`. Apply the actually-intended ASPM powersaving. Won't fix freezes but stops misleading future investigations.
 
-### Attempt 4 — switch to 6.12 LTS — IN PROGRESS (applied 2026-05-24)
-MT7922 BT fix `e3ac0d9f1a20` is confirmed in **6.12.91** (verified via direct grep of `cdn.kernel.org/pub/linux/kernel/v6.x/ChangeLog-6.12.91`). Our MT7922 is vendor `0489:e0f6` — covered by the fix. Changed `boot.kernelPackages = pkgs.linuxPackages_6_6` → `linuxPackages_6_12`.
+### Attempt 4 — switch to 6.12 LTS — BLOCKED, REVERTED (2026-05-24)
+Switched `linuxPackages_6_6` → `linuxPackages_6_12`. Got **6.12.90**, which is exactly one point release behind the fix: `e3ac0d9f1a20` landed in 6.12.91 (released 2026-05-23). On reboot:
+```
+Bluetooth: hci0: Failed to send wmt func ctrl (-22)
+hci0: ... DOWN
+No default controller available
+```
+nixpkgs lag confirmed by checking both channels:
+- `nixos-25.11` → 6.12.90 / 7.0.9
+- `nixos-unstable` → 6.12.90 / 7.0.9
+Both broken branches; neither has the fix yet. Reverted to `linuxPackages_6_6` (6.6.140 — never affected by the btmtk regression).
 
-What this brings beyond the BT fix:
-- 18 months of amdgpu work between 6.6 and 6.12, incl. mainline `disable_dsc_power_gate=true` patch for the `dcn314_dsc_pg_control` warnings.
-- Lots of Phoenix suspend/resume stabilization.
+Superseded by Attempt 4b — went straight to 6.18.33 via src override instead of waiting for nixpkgs.
 
-Why this is the highest-ROI attempt: the same hardware/config works on Arch (mainline). Kernel version is the biggest delta.
+### Attempt 4b — 6.18.33 via src override (2026-05-24)
+Same nixpkgs-lag situation on 6.18: ships `linux_6_18` at 6.18.32 (one patch short of fix `e3ac0d9f1a20`, which is in 6.18.33). Rather than wait for nixpkgs to bump, override `linux_6_18.src` to the upstream 6.18.33 tarball from cdn.kernel.org. Patch-level bump (32→33) so all of nixpkgs's 6.18 patches still apply cleanly.
 
-Avoided: 6.18.y (G14 amdgpu boot crash reports since 6.18.7, [Arch BBS 311920](https://bbs.archlinux.org/viewtopic.php?id=311920)). 7.0.y also fixed but stable-branch-only, drops support when next mainline lands ~July 2026.
+Picked 6.18 over 6.12.91 because:
+- Same BT fix is in both, same override-shape cost.
+- 6.18 has ~6 more months of Phoenix amdgpu fixes than 6.12 — better chance of resolving the freezes, which is the actual goal.
+- 6.18 includes `disable_dsc_power_gate=true` default (kills the `dcn314_dsc_pg_control` REG_WAIT noise).
 
-Verify after reboot:
-- `uname -r` → `6.12.91` or newer
-- `bluetoothctl show` → bluetooth functional, no `-22` errors in `dmesg | grep btmtk`
-- `dmesg | grep dcn314_dsc_pg_control` → should be silent
-- Use the system normally for ~24h including suspend/resume cycles — watch for freezes
+Cost: ~30–60 min first compile, then cached.
 
-Result: _pending_
+Watch on next freeze run:
+- Did `Failed to send wmt func ctrl` go away? (BT working = override applied correctly)
+- Did the hard hangs go away? (real test)
+- Is `dcn314_dsc_pg_control` REG_WAIT gone from journal? (sanity check we're on 6.18)
 
 ### Attempt 5 — binary-search ASPM
 One boot with `pcie_aspm=off`. If freezes stop, ASPM is involved. Real battery cost while testing.

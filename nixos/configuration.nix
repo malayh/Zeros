@@ -23,12 +23,22 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
   
-  # 6.12 LTS. MT7922 BT fix e3ac0d9f1a20 ("accept too short WMT FUNC_CTRL
-  # events") landed in 6.12.91, so the regression that kept us on 6.6 is
-  # gone. Moving forward also picks up 18 months of Phoenix amdgpu work
-  # (incl. dcn314 disable_dsc_power_gate) — see nixos/bootisse.md.
-  # Avoid 6.18.y: G14 amdgpu boot crashes reported since 6.18.7.
-  boot.kernelPackages = pkgs.linuxPackages_6_12;
+  # 6.18.33: brings 18mo of Phoenix amdgpu fixes (vs the 6.6 LTS we ran before)
+  # AND the MT7922 BT fix e3ac0d9f1a20. nixpkgs ships linux_6_18 at .32 which
+  # is one patch short of the BT fix, so we override the src to the upstream
+  # .33 tarball. See nixos/bootissue.md.
+  boot.kernelPackages = let
+    linux_6_18_33 = pkgs.linux_6_18.override {
+      argsOverride = rec {
+        version = "6.18.33";
+        modDirVersion = "6.18.33";
+        src = pkgs.fetchurl {
+          url = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${version}.tar.xz";
+          sha256 = "10mp1ypsdz42jr26g1xxbw806mvpy0n35418fhsgxxlr4lqgy5kg";
+        };
+      };
+    };
+  in pkgs.linuxPackagesFor linux_6_18_33;
   hardware.enableRedistributableFirmware = true;
 
   boot.kernelParams = [
