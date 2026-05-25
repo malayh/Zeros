@@ -100,6 +100,42 @@ Tradeoff: very chatty log. Only worth it once everything else is exhausted.
 ### Attempt 7 (independent — for greeter freeze): SDDM off Wayland
 If keyboard-dead-at-greeter keeps happening: `services.displayManager.sddm.wayland.enable = false;` or move to `greetd` + `tuigreet`. Sidesteps the weston-greeter SIGABRT.
 
+## New symptom class — 2026-05-25 (kernel 6.18.33)
+
+After moving to 6.18.33 (Attempt 4b applied), got a freeze with a *different* shape:
+- **Existing windows stayed interactable** — could scroll/click inside Brave + nautilus.
+- **Hyprland binds dead** — SUPER+keys did nothing (couldn't bring up rofi).
+- **Waybar icon clicks dead** — clicking a launcher icon on waybar did nothing.
+- **No new windows could be spawned** at all (any path: bind, waybar, scripted).
+- Hard reset via power button (no path back to login).
+
+Journal cut at 09:55:15 from user session; system journal (asusd heartbeat etc.) kept going till 09:57:10 — so kernel/system was alive ~2 minutes after the user session went dark. Not a kernel hang.
+
+**What this means:** input forwarding to focused surfaces still works, but Hyprland's main-loop dispatch path is wedged (binds + IPC + spawn all block). Classic "compositor main thread stuck on a blocking syscall" pattern. The pixman_region32_init_rect spam from boot is unrelated (fires at 09:41:46 init, not 09:55).
+
+**Suspects (new):**
+- `xdg-desktop-portal-gtk` SIGSEGV'd 2026-05-24 21:11 (coredump on disk). Portal calls were still firing at 09:55:00/09:55:15 (the two "Inhibiting other than idle not supported" lines were the last user-session log entries). A wedged portal can stall any client that makes a sync portal call — and if Hyprland's main thread initiates a portal call (e.g. for GlobalShortcuts) and the broker takes too long, the whole compositor stalls.
+- uwsm-app spawn path: every launch goes `keybind → Hyprland → exec → uwsm-app → systemd-run --user → user dbus`. If user dbus is stuck (e.g. on a portal call), all spawns block — Hyprland itself doesn't normally synchronously wait, but waybar's click handlers and other helpers will.
+- **Hyprland logs are disabled by default** — `debug:disable_logs=true` means we have no record of what dispatcher fired right before the wedge. Need to flip this before we can pin a cause.
+
+### Attempt 5 — drop gtk portal + enable Hyprland logs + install snapshot timer (2026-05-25)
+
+Three changes shipped:
+
+1. **Dropped `xdg-desktop-portal-gtk`** from `configuration.nix` extraPortals, and dropped `xdg.portal.config.common.default = "*"`. gtk portal's `UseIn=gnome` so without the wildcard default it wouldn't be picked for Hyprland anyway — the wildcard was forcing it in. Now only `xdg-desktop-portal-hyprland` (auto from `programs.hyprland.enable`) + `gnome-keyring.portal` are active. Screen sharing unaffected (hyprland portal owns ScreenCast/Screenshot/GlobalShortcuts). FileChooser/Settings interfaces now unserved — flatpak file pickers may fall back, native GTK/Qt apps unaffected (they don't use portal FileChooser by default).
+
+2. **Enabled Hyprland debug logs** via new `nixos/config/hypr/debug.conf` (`debug { disable_logs = false }`) sourced from `hyprland.conf`. Output goes to the journal under `uwsm_Hyprland[<pid>]` and to `/run/user/1000/hypr/<sig>/hyprland.log`. Hyprland config file change only — picked up on next session start (or `hyprctl reload`), no nixos-rebuild needed.
+
+3. **System-level freeze-snapshot timer** added to `configuration.nix`: writes a snapshot of user-process state to `/var/log/freeze-snapshots/` every 30s. Runs as root from system systemd so a wedged user bus / Hyprland can't block it. Captures `ps -L` with wchan, `/proc/<hyprland>/wchan` per-thread, `lsof` of Hyprland sockets, a `timeout 2 hyprctl version` ping (non-zero exit = wedged), and dmesg errors. Files age out after 1d.
+
+On next freeze: post-reboot, read the *most recent* file in `/var/log/freeze-snapshots/` — the one timestamped just before the journal goes dark shows what each Hyprland thread was blocked on (wchan), whether IPC was already wedged, and what unix sockets were open. Combined with the Hyprland debug log tail, this should let us pin which dispatcher / which portal call / which child wait was the trigger.
+
+Watch on next freeze:
+- Does the freeze still happen with gtk portal gone? (if no → gtk portal was the cause)
+- Last snapshot's `hyprctl exit` field: was IPC already wedged?
+- Last snapshot's Hyprland-thread wchans: are any blocked in `futex_wait`, `epoll_wait` on a known fd, `do_sys_poll` on the dbus socket?
+- Hyprland journal log tail: which dispatcher was last invoked?
+
 ## Notes
 - `powerManagement.resumeCommands` Vfio→Integrated bounce in `devices/g14/g14.nix` is load-bearing per its comment ("G14 wakes from suspend with the dGPU re-attached"). Don't touch.
 - Reference threads if more ammo needed: Ubuntu LP #2024774, drm/amd issue #2227, Arch BBS 298760, Framework community thread on 780M amdgpu issues.
