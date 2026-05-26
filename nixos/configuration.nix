@@ -118,10 +118,13 @@ in
       Type = "oneshot";
       ExecStart = pkgs.writeShellScript "freeze-snapshot" ''
         set +e
-        out=/var/log/freeze-snapshots/$(date +%Y%m%d-%H%M%S).log
+        ts=$(date +%Y%m%d-%H%M%S)
+        out=/var/log/freeze-snapshots/$ts.log
         exec >"$out" 2>&1
         echo "=== date ==="; date
         echo "=== uptime ==="; uptime
+        echo "=== last suspend/resume in this boot ==="
+        ${pkgs.systemd}/bin/journalctl -b 2>/dev/null | ${pkgs.gnugrep}/bin/grep -E "Suspending\.\.\.|System returned from sleep|PM: suspend (entry|exit)|Lid (closed|opened)" | tail -10
         echo "=== ps -u malay -L (state, wchan, cmd) ==="
         ${pkgs.procps}/bin/ps -u malay -Lo pid,tid,stat,wchan:32,cmd --no-headers
         hpid=$(${pkgs.procps}/bin/pgrep -u malay -x Hyprland | head -1)
@@ -140,12 +143,17 @@ in
         else
           echo "(no Hyprland process found)"
         fi
-        echo "=== IPC ping (timeout 2s; non-zero exit = WEDGED) ==="
         sig=$(ls /run/user/1000/hypr/ 2>/dev/null | head -1)
         if [ -n "$sig" ]; then
+          # tmpfs gets wiped on reboot — copy Hyprland's log into persistent storage.
+          hlog=/run/user/1000/hypr/$sig/hyprland.log
+          if [ -f "$hlog" ]; then
+            cp -f "$hlog" /var/log/freeze-snapshots/$ts.hyprland.log 2>/dev/null
+          fi
+          echo "=== IPC ping: hyprctl activeworkspace (timeout 2s; non-zero = WEDGED) ==="
           timeout --kill-after=1 2 ${pkgs.util-linux}/bin/runuser -u malay -- \
             env HYPRLAND_INSTANCE_SIGNATURE=$sig XDG_RUNTIME_DIR=/run/user/1000 \
-            ${pkgs.hyprland}/bin/hyprctl version >/dev/null
+            ${pkgs.hyprland}/bin/hyprctl activeworkspace 2>&1 | head -5
           echo "hyprctl exit=$?"
         else
           echo "(no hypr signature dir)"

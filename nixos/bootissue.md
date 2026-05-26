@@ -136,6 +136,46 @@ Watch on next freeze:
 - Last snapshot's Hyprland-thread wchans: are any blocked in `futex_wait`, `epoll_wait` on a known fd, `do_sys_poll` on the dbus socket?
 - Hyprland journal log tail: which dispatcher was last invoked?
 
+### Attempt 5 — outcome (2026-05-26)
+
+Freeze recurred at ~14:55 IST despite gtk portal removed. So **gtk portal is NOT the trigger** — ruled out.
+
+What the snapshots showed:
+- Last successful snapshot at 14:54:48: Hyprland main thread in `do_epoll_wait`, all worker threads in `futex_do_wait` (normal idle state). `hyprctl version` exit=0. **System internally healthy at this point.**
+- Next scheduled snapshot would have been 14:55:18, but the user power-keyed at 14:55:04 (16s after last good snapshot), so no snapshot caught the wedge state.
+- Journal: `Lid opened.` at 14:55:02 → `Power key pressed short.` at 14:55:04. The user had the lid closed from 10:23:21 (4.5 hours of lid-closed runtime).
+- Two auto-suspend cycles in this boot: 13:22→13:33 and **14:41:25 → 14:45:07** (s2idle). The freeze symptoms appeared ~10 min after the second resume.
+
+This **matches** the earlier "froze ~3 min after resume from suspend" data point from Run 1. Suspend/resume is now a strong contributory suspect — but not exclusive (we have prior freezes with no recent suspend too).
+
+**Cannot disambiguate from this freeze alone:**
+1. Whether Hyprland's main loop actually wedged in those 16 seconds, OR
+2. Whether the user opened the lid, saw no display output (a display-wake bug), and power-keyed reflexively before testing inputs.
+
+**Gap in instrumentation:** Hyprland's debug log lives at `/run/user/1000/hypr/<sig>/hyprland.log` — tmpfs, wiped on reboot. Had `debug:disable_logs=false` on but lost everything on the forced reboot.
+
+### Boot -1 weston SIGABRT (2026-05-26) — recurrence of Run-1 greeter bug
+
+After the user power-keyed the wedged session, the next boot got stuck before SDDM displayed and had to be power-cycled again. Cause:
+
+- 14:56:07 SDDM started weston-kiosk greeter (Mesa 25.2.6, kernel 6.18.33, AMD Radeon 780M)
+- 14:56:08 weston SIGABRT'd — stack: `__assert_fail` → `atomic_flip_handler` (drm-backend.so) → `drmHandleEvent` (libdrm.so.2) → `on_drm_input`. Weston aborts on its first atomic page-flip event.
+- No greeter visible → user power-cycled at 14:56:59.
+
+Same crash class as documented in Run 1 (weston greeter SIGABRT in gl-renderer.so / libdrm_amdgpu.so.1). Fix is sitting in Attempt 7 (set `services.displayManager.sddm.wayland.enable = false`). User opted to leave it for now since it only manifests on the boot-after-wedge path; will revisit if it becomes routine.
+
+### Attempt 6 — better instrumentation (2026-05-26)
+
+Changes to freeze-snapshot:
+1. **Copy Hyprland's tmpfs log to `/var/log/freeze-snapshots/<ts>.hyprland.log` every 30s.** Persistent across reboots.
+2. **IPC ping now uses `hyprctl activeworkspace` instead of `version`.** activeworkspace exercises more of the dispatch path; `version` is a static-string handler. If main loop is wedged, this should catch it where version wouldn't.
+3. **Snapshot now includes the last 10 suspend/resume/lid events** so we don't have to cross-reference journalctl.
+
+Watch on next freeze:
+- Most recent `*.hyprland.log` in `/var/log/freeze-snapshots/` — what was the last dispatcher to fire? Any error/warning before silence?
+- Newest snapshot's "last suspend/resume" block — did a suspend happen shortly before the freeze?
+- `hyprctl activeworkspace` exit status across the last 3-4 snapshots — when did it first start hanging?
+
 ## Notes
 - `powerManagement.resumeCommands` Vfio→Integrated bounce in `devices/g14/g14.nix` is load-bearing per its comment ("G14 wakes from suspend with the dGPU re-attached"). Don't touch.
 - Reference threads if more ammo needed: Ubuntu LP #2024774, drm/amd issue #2227, Arch BBS 298760, Framework community thread on 780M amdgpu issues.
