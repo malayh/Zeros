@@ -2,17 +2,17 @@ source ~/.secrets
 
 
 # Prod us main
-#export OSUITE_API_KEY=osk_0ef28fb9b43cc9f876123619097ec54a9ddda3a4764438d1b7c4473d911aedc4
-#export OSUITE_API_ENDPOINT=https://api.us.osuite.io
+export OSUITE_API_KEY=osk_0ef28fb9b43cc9f876123619097ec54a9ddda3a4764438d1b7c4473d911aedc4
+export OSUITE_API_ENDPOINT=https://api.us.osuite.io
 # prod demo
 #export OSUITE_API_KEY=osk_52ed2c988302461abd46f60979b46a811e1d88c9b46ee0c35564e05d8a1d2ec4
 
 # local
-export OSUITE_API_ENDPOINT=http://127.0.0.1:8000
-export OSUITE_API_KEY=osk_0e7c86dab870b495f109848e7f208929d5a40959ed92ede212088b46243902c5
+#export OSUITE_API_ENDPOINT=http://127.0.0.1:8000
+#export OSUITE_API_KEY=osk_0e7c86dab870b495f109848e7f208929d5a40959ed92ede212088b46243902c5
 export AWS_PROFILE=osuite
 export PATH="$HOME/.local/bin:$PATH"
-
+export PATH=~/.npm-global/bin:$PATH
 
 alias l="ls -lrt"
 eval "$(zoxide init bash)"
