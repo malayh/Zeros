@@ -12,7 +12,8 @@
     "network",
     "pulseaudio",
     "cpu",
-    "battery"
+    "battery",
+    "custom/temperature"
   ],
   "hyprland/workspaces": {
     "on-click": "activate",
@@ -43,6 +44,12 @@
     "interval": 5,
     "format": "󰍛",
     "on-click": "custom-launch-or-focus-tui btop --force-utf"
+  },
+  "custom/temperature": {
+    "exec": "custom-waybar-temp",
+    "return-type": "json",
+    "interval": 5,
+    "format": "󰔏 {}"
   },
   // Waybar's built-in clock uses C++20 chrono specs, which lack unpadded-hour
   // (`%-I`) and space-padded-hour (`%l`).  Shelling out to GNU `date` gives us

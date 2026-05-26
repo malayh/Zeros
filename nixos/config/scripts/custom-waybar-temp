@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Print waybar JSON: text is max(CPU, GPU) temp in °C; tooltip lists both
+# temperatures and both fan speeds. Devices are looked up by hwmon `name`
+# so the result survives hwmonN reordering across boots.
+set -euo pipefail
+
+find_hwmon() {
+    for d in /sys/class/hwmon/hwmon*; do
+        [ -r "$d/name" ] && [ "$(cat "$d/name")" = "$1" ] && { echo "$d"; return 0; }
+    done
+    return 1
+}
+
+read_temp() { [ -r "$1" ] && awk '{ printf "%d", $1/1000 }' "$1"; }
+
+cpu_t=""; gpu_t=""
+if d=$(find_hwmon k10temp); then cpu_t=$(read_temp "$d/temp1_input"); fi
+if d=$(find_hwmon amdgpu);  then gpu_t=$(read_temp "$d/temp1_input"); fi
+
+cpu_f=""; gpu_f=""
+if d=$(find_hwmon asus); then
+    for lf in "$d"/fan*_label; do
+        [ -r "$lf" ] || continue
+        idx=${lf##*/fan}; idx=${idx%_label}
+        rpm_file="$d/fan${idx}_input"
+        [ -r "$rpm_file" ] || continue
+        case "$(cat "$lf")" in
+            cpu_fan) cpu_f=$(cat "$rpm_file") ;;
+            gpu_fan) gpu_f=$(cat "$rpm_file") ;;
+        esac
+    done
+fi
+
+if [ -z "$cpu_t" ] && [ -z "$gpu_t" ]; then
+    echo '{"text":"--","tooltip":"no temperature sensors found"}'; exit 0
+fi
+
+if [ -z "$gpu_t" ] || { [ -n "$cpu_t" ] && [ "$cpu_t" -ge "$gpu_t" ]; }; then
+    max_t="$cpu_t"
+else
+    max_t="$gpu_t"
+fi
+
+class=""
+[ "$max_t" -ge 85 ] && class="hot"
+[ "$max_t" -ge 70 ] && [ -z "$class" ] && class="warm"
+
+lines=()
+[ -n "$cpu_t" ] && lines+=("CPU ${cpu_t}°C")
+[ -n "$gpu_t" ] && lines+=("GPU ${gpu_t}°C")
+[ -n "$cpu_f" ] && lines+=("CPU fan ${cpu_f} RPM")
+[ -n "$gpu_f" ] && lines+=("GPU fan ${gpu_f} RPM")
+tooltip=$(IFS='|'; echo "${lines[*]}")
+tooltip=${tooltip//|/\\n}
+
+printf '{"text":"%s°","tooltip":"%s","class":"%s"}\n' "$max_t" "$tooltip" "$class"

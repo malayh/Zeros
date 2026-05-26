@@ -34,12 +34,16 @@
 #cpu,
 #battery,
 #pulseaudio,
+#custom-temperature,
 #custom-omarchy,
 #custom-screenrecording-indicator,
 #custom-update {
   min-width: 12px;
   margin: 0 7.5px;
 }
+
+#custom-temperature.warm { color: #f9e2af; }
+#custom-temperature.hot  { color: #f38ba8; }
 
 #tray {
   margin-right: 16px;
