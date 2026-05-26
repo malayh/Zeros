@@ -10,6 +10,8 @@ source ~/.secrets
 # local
 export OSUITE_API_ENDPOINT=http://127.0.0.1:8000
 export OSUITE_API_KEY=osk_0e7c86dab870b495f109848e7f208929d5a40959ed92ede212088b46243902c5
+export AWS_PROFILE=osuite
+export PATH="$HOME/.local/bin:$PATH"
 
 
 alias l="ls -lrt"
@@ -24,4 +26,3 @@ source /home/malay/.helpers/justfile.bash
 source /home/malay/.helpers/kubernates.bash
 source /home/malay/.helpers/misc.bash
 source /home/malay/.helpers/nix.bash
-export PATH="$HOME/.local/bin:$PATH"
