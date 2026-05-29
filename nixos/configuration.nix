@@ -110,16 +110,14 @@ in
     "L+ /bin/bash - - - - ${pkgs.bash}/bin/bash"
   ];
 
-  # gtk portal dropped — suspected freeze-trigger; see nixos/bootissue.md.
-  # hyprland portal still active via programs.hyprland.enable.
   xdg.portal.enable = true;
-
   security.polkit.enable = true;
   services.gnome.gnome-keyring.enable = true;
   programs.seahorse.enable = true;
   services.power-profiles-daemon.enable = true;
   hardware.i2c.enable = true;
   virtualisation.docker.enable = true;
+  virtualisation.libvirtd.enable = true;
   services.udisks2.enable = true;
   programs.nix-ld.enable = true;
 
@@ -142,7 +140,7 @@ in
   users.users.malay = {
     isNormalUser = true;
     description = "Malay";
-    extraGroups = [ "networkmanager" "wheel" "video" "i2c" "docker" ];
+    extraGroups = [ "networkmanager" "wheel" "video" "i2c" "docker" "libvirtd" "kvm" ];
     packages = with pkgs; [ ];
   };
 
