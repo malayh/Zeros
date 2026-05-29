@@ -106,74 +106,9 @@ in
   # owned by malay:users so custom-set-wallpaper can write without sudo.
   systemd.tmpfiles.rules = [
     "d /var/lib/sddm-backgrounds 0755 malay users -"
-    # Freeze-debug ring buffer: snapshots age out after 1d.
-    "d /var/log/freeze-snapshots 0755 root root 1d"
     # Replaces what envfs used to synthesize for #!/bin/bash shebangs.
     "L+ /bin/bash - - - - ${pkgs.bash}/bin/bash"
   ];
-
-  # Runs as root from system systemd so a wedged user bus / Hyprland can't
-  # block it. See nixos/bootissue.md.
-  systemd.services.freeze-snapshot = {
-    description = "Snapshot user-session state for freeze diagnosis";
-    serviceConfig = {
-      Type = "oneshot";
-      ExecStart = pkgs.writeShellScript "freeze-snapshot" ''
-        set +e
-        ts=$(date +%Y%m%d-%H%M%S)
-        out=/var/log/freeze-snapshots/$ts.log
-        exec >"$out" 2>&1
-        echo "=== date ==="; date
-        echo "=== uptime ==="; uptime
-        echo "=== last suspend/resume in this boot ==="
-        ${pkgs.systemd}/bin/journalctl -b 2>/dev/null | ${pkgs.gnugrep}/bin/grep -E "Suspending\.\.\.|System returned from sleep|PM: suspend (entry|exit)|Lid (closed|opened)" | tail -10
-        echo "=== ps -u malay -L (state, wchan, cmd) ==="
-        ${pkgs.procps}/bin/ps -u malay -Lo pid,tid,stat,wchan:32,cmd --no-headers
-        hpid=$(${pkgs.procps}/bin/pgrep -u malay -x Hyprland | head -1)
-        if [ -n "$hpid" ]; then
-          echo "=== /proc/$hpid/status (Hyprland) ==="
-          grep -E '^(State|Threads|VmRSS|voluntary|nonvoluntary)' /proc/$hpid/status
-          echo "=== /proc/$hpid/wchan ==="
-          cat /proc/$hpid/wchan; echo
-          echo "=== /proc/$hpid/task/*/wchan ==="
-          for t in /proc/$hpid/task/*/wchan; do
-            tid=$(echo "$t" | ${pkgs.gnused}/bin/sed 's|.*/task/||;s|/wchan||')
-            printf '%s\t' "$tid"; cat "$t"; echo
-          done
-          echo "=== open sockets (lsof -nP -p $hpid -ad u,unix,sock) ==="
-          ${pkgs.lsof}/bin/lsof -nP -p $hpid 2>/dev/null | ${pkgs.gnugrep}/bin/grep -E 'unix|sock|pipe' | head -40
-        else
-          echo "(no Hyprland process found)"
-        fi
-        sig=$(ls /run/user/1000/hypr/ 2>/dev/null | head -1)
-        if [ -n "$sig" ]; then
-          # tmpfs gets wiped on reboot — copy Hyprland's log into persistent storage.
-          hlog=/run/user/1000/hypr/$sig/hyprland.log
-          if [ -f "$hlog" ]; then
-            cp -f "$hlog" /var/log/freeze-snapshots/$ts.hyprland.log 2>/dev/null
-          fi
-          echo "=== IPC ping: hyprctl activeworkspace (timeout 2s; non-zero = WEDGED) ==="
-          timeout --kill-after=1 2 ${pkgs.util-linux}/bin/runuser -u malay -- \
-            env HYPRLAND_INSTANCE_SIGNATURE=$sig XDG_RUNTIME_DIR=/run/user/1000 \
-            ${pkgs.hyprland}/bin/hyprctl activeworkspace 2>&1 | head -5
-          echo "hyprctl exit=$?"
-        else
-          echo "(no hypr signature dir)"
-        fi
-        echo "=== dmesg tail (errors) ==="
-        ${pkgs.util-linux}/bin/dmesg -T --level=err,warn 2>/dev/null | tail -20
-      '';
-    };
-  };
-  systemd.timers.freeze-snapshot = {
-    description = "Run freeze-snapshot every 30s";
-    wantedBy = [ "timers.target" ];
-    timerConfig = {
-      OnBootSec = "1min";
-      OnUnitActiveSec = "30s";
-      AccuracySec = "5s";
-    };
-  };
 
   # gtk portal dropped — suspected freeze-trigger; see nixos/bootissue.md.
   # hyprland portal still active via programs.hyprland.enable.
@@ -186,13 +121,6 @@ in
   hardware.i2c.enable = true;
   virtualisation.docker.enable = true;
   services.udisks2.enable = true;
-  # envfs disabled 2026-05-27 — the userspace mount.envfs daemon was hanging,
-  # leaving /usr/bin and /bin FUSE mounts unresponsive, which uninterruptibly
-  # blocked every stat()/open() on those paths (D state in request_wait_answer).
-  # That's the cause of the recurring "compositor looks healthy but new
-  # processes won't start" freezes. nix-ld covers the dynamic-linker shim;
-  # /usr/bin/env is symlinked by system activation. See nixos/bootissue.md.
-  services.envfs.enable = false;
   programs.nix-ld.enable = true;
 
   # --- Fonts ---
