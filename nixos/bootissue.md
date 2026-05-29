@@ -176,6 +176,54 @@ Watch on next freeze:
 - Newest snapshot's "last suspend/resume" block — did a suspend happen shortly before the freeze?
 - `hyprctl activeworkspace` exit status across the last 3-4 snapshots — when did it first start hanging?
 
+### Freeze 2026-05-27 11:25 — ROOT CAUSE FOUND: envfs FUSE hang
+
+User reported during the wedge: browser still usable, keyboard switching between Hyprland workspaces still works, **but new terminals don't start, `df -kH` hangs, `ls`/`cd` (bash builtins) still work, waybar buttons that exec scripts don't fire.** That symptom set is "anything needing a new process hangs; anything purely in-process is fine."
+
+Snapshots:
+- `20260527-112448.log` (last good): IPC `hyprctl exit=0`, Hyprland in `do_epoll_wait` (healthy). Dmesg tail in this same snapshot ALREADY shows the smoking gun:
+  ```
+  [Wed May 27 11:23:59] INFO: task pet:69745 blocked for more than 122 seconds.
+  ```
+  So the freeze began ~11:21:57 (122s before the warning).
+- `20260527-112518.log` and `.hyprland.log`: **0 bytes**. The freeze-snapshot script itself couldn't even write `=== date ===` (its first echo). Means the snapshot shell — running as root — also couldn't make progress as soon as it tried to `pgrep`/`ps` (which `stat` PATH entries via envfs).
+- Then nothing until reboot at 11:27.
+
+Full kernel stack for the `pet` D-state thread (from journal of previous boot):
+```
+__do_sys_newstat
+  → vfs_statx → filename_lookup → path_lookupat → walk_component → lookup_fast
+    → fuse_dentry_revalidate → __fuse_simple_request → request_wait_answer → schedule
+```
+
+`pet` is `/home/malay/.vscode/extensions/ms-python.vscode-python-envs-1.20.1-linux-x64/python-env-tools/bin/pet server` — the python-envs VS Code extension's environment discovery daemon. It periodically `stat()`s python interpreters across PATH, which includes `/usr/bin` and `/bin`. Both are envfs FUSE mounts (`services.envfs.enable = true;`):
+
+```
+envfs on /usr/bin type fuse (ro,nosuid,nodev,relatime,user_id=0,group_id=0,...)
+envfs on /bin     type fuse (ro,nosuid,nodev,relatime,user_id=0,group_id=0,...)
+```
+
+What broke: the userspace `mount.envfs` daemon (PID 929 in the wedged boot) stopped replying to FUSE requests. No crash log, no OOM, no journal message about it dying — it simply went unresponsive. Once that happens, **every** subsequent `stat`/`open`/`readlink` on a path under `/usr/bin/*` or `/bin/*` blocks in D state in `request_wait_answer`. There's no timeout — D-state waits for FUSE replies are uninterruptible.
+
+Cascade once envfs wedged:
+- Bash builtins (`ls`/`cd` on cwd not under /usr or /bin) → still work.
+- Anything that walks `$PATH` (new shell, `df`, `which`, waybar button scripts, `pgrep` from the snapshot script) → blocks at first `/usr/bin/...` stat. Forever.
+- Existing processes (browser, Hyprland epoll loop, IPC handlers that don't touch fs) → keep running. Hence IPC returned 0 *and* the workspace switching still worked.
+
+**This is the same shape as previous "freezes" too.** The recurring pattern was always: last-good snapshot shows compositor healthy + IPC responding, but nothing on the user side can be invoked. We've been chasing a Hyprland/amdgpu bug for weeks; the compositor was a victim, not the cause.
+
+Suspend/resume correlation in Run 1 (earlier freezes after resume) is now explainable too: resume kicks PATH-traversing background work (xdg autostart, dbus activations, asusd polling external scripts), any of which can be the first thing to hit the wedged FUSE mount.
+
+### Attempt 8 (planned) — kill envfs
+
+Set `services.envfs.enable = false;` in `configuration.nix`. Rationale:
+- `programs.nix-ld.enable = true;` already covers the dynamic-linker shim half of "make non-Nix binaries work."
+- `/usr/bin/env` works in NixOS without envfs (it's symlinked to the coreutils env via system activation).
+- Things that hard-code `/usr/bin/<tool>` paths are rare and fixable per-case (wrappers, `programs.<tool>.enable`, or patching the script).
+- The python-envs VS Code extension's `pet` will lose its envfs-mediated view of `/usr/bin`. It still works via `$PATH`-relative discovery; will just see fewer pythons. Acceptable.
+
+Drop everything in one toggle. The risk is small ("might lose a `/usr/bin/foo` shim somewhere"); the reward is large ("kernel can never wedge here again").
+
 ## Notes
 - `powerManagement.resumeCommands` Vfio→Integrated bounce in `devices/g14/g14.nix` is load-bearing per its comment ("G14 wakes from suspend with the dGPU re-attached"). Don't touch.
 - Reference threads if more ammo needed: Ubuntu LP #2024774, drm/amd issue #2227, Arch BBS 298760, Framework community thread on 780M amdgpu issues.

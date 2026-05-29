@@ -108,6 +108,8 @@ in
     "d /var/lib/sddm-backgrounds 0755 malay users -"
     # Freeze-debug ring buffer: snapshots age out after 1d.
     "d /var/log/freeze-snapshots 0755 root root 1d"
+    # Replaces what envfs used to synthesize for #!/bin/bash shebangs.
+    "L+ /bin/bash - - - - ${pkgs.bash}/bin/bash"
   ];
 
   # Runs as root from system systemd so a wedged user bus / Hyprland can't
@@ -184,7 +186,13 @@ in
   hardware.i2c.enable = true;
   virtualisation.docker.enable = true;
   services.udisks2.enable = true;
-  services.envfs.enable = true;
+  # envfs disabled 2026-05-27 — the userspace mount.envfs daemon was hanging,
+  # leaving /usr/bin and /bin FUSE mounts unresponsive, which uninterruptibly
+  # blocked every stat()/open() on those paths (D state in request_wait_answer).
+  # That's the cause of the recurring "compositor looks healthy but new
+  # processes won't start" freezes. nix-ld covers the dynamic-linker shim;
+  # /usr/bin/env is symlinked by system activation. See nixos/bootissue.md.
+  services.envfs.enable = false;
   programs.nix-ld.enable = true;
 
   # --- Fonts ---
@@ -216,6 +224,7 @@ in
     vim
     wget
     git
+    glib
     sddm-theme-zeros
   ];
 
