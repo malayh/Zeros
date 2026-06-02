@@ -1,0 +1,11 @@
+#!/bin/bash
+
+monitor_id=$1
+
+monitor_name=$(hyprctl monitors -j | jq -r --argjson id "$monitor_id" '.[] | select(.id == $id) | .name')
+
+[[ -z $monitor_name ]] && exit 1
+
+workspace=$(hyprctl activeworkspace -j | jq -r '.id')
+
+hyprctl dispatch moveworkspacetomonitor "$workspace $monitor_name"
