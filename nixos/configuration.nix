@@ -43,6 +43,7 @@ in
 
   boot.kernelParams = [
     "pcie_aspm.policy=powersave"
+    "kvm.enable_virt_at_load=0"
   ];
 
   networking.networkmanager.enable = true;
