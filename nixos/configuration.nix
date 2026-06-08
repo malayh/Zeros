@@ -118,6 +118,7 @@ in
   hardware.i2c.enable = true;
   virtualisation.docker.enable = true;
   virtualisation.libvirtd.enable = true;
+  virtualisation.virtualbox.host.enable = true;
   services.udisks2.enable = true;
   programs.nix-ld.enable = true;
 
@@ -140,7 +141,7 @@ in
   users.users.malay = {
     isNormalUser = true;
     description = "Malay";
-    extraGroups = [ "networkmanager" "wheel" "video" "i2c" "docker" "libvirtd" "kvm" ];
+    extraGroups = [ "networkmanager" "wheel" "video" "i2c" "docker" "libvirtd" "kvm" "vboxusers" ];
     packages = with pkgs; [ ];
   };
 

@@ -58,7 +58,6 @@
     # apps
     ghostty
     nautilus
-    gnome-boxes
     libreoffice
     chromium
     brave
