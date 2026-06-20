@@ -50,6 +50,7 @@ in
   # LocalSend discovery (UDP multicast) + transfer/registration (TCP) on 53317.
   networking.firewall.allowedTCPPorts = [ 53317 ];
   networking.firewall.allowedUDPPorts = [ 53317 ];
+  networking.firewall.trustedInterfaces = [ "docker0" "br-+" ];
   time.timeZone = "Asia/Kolkata";
 
   hardware.bluetooth.enable = true;
