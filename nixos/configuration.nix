@@ -23,22 +23,8 @@ in
   boot.loader.efi.canTouchEfiVariables = true;
   boot.supportedFilesystems = [ "ntfs" "exfat" ];
   
-  # 6.18.33: brings 18mo of Phoenix amdgpu fixes (vs the 6.6 LTS we ran before)
-  # AND the MT7922 BT fix e3ac0d9f1a20. nixpkgs ships linux_6_18 at .32 which
-  # is one patch short of the BT fix, so we override the src to the upstream
-  # .33 tarball. See nixos/bootissue.md.
-  boot.kernelPackages = let
-    linux_6_18_33 = pkgs.linux_6_18.override {
-      argsOverride = rec {
-        version = "6.18.33";
-        modDirVersion = "6.18.33";
-        src = pkgs.fetchurl {
-          url = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${version}.tar.xz";
-          sha256 = "10mp1ypsdz42jr26g1xxbw806mvpy0n35418fhsgxxlr4lqgy5kg";
-        };
-      };
-    };
-  in pkgs.linuxPackagesFor linux_6_18_33;
+  # 6.18 LTS: MT7922 BT fix e3ac0d9f1a20 needs >= 6.18.33; 26.05 ships 6.18.44.
+  boot.kernelPackages = pkgs.linuxPackages_6_18;
   hardware.enableRedistributableFirmware = true;
 
   boot.kernelParams = [

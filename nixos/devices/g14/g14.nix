@@ -21,10 +21,7 @@
     "resume_offset=${builtins.readFile /etc/nixos/resume-offset}";
 
 
-  services.asusd = {
-    enable = true;
-    enableUserService = true;
-  };
+  services.asusd.enable = true;
   services.supergfxd.enable = true;
 
   # NVIDIA Optimus + supergfxd. Without the driver installed, supergfxd's

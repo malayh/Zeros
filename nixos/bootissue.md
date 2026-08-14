@@ -224,6 +224,10 @@ Set `services.envfs.enable = false;` in `configuration.nix`. Rationale:
 
 Drop everything in one toggle. The risk is small ("might lose a `/usr/bin/foo` shim somewhere"); the reward is large ("kernel can never wedge here again").
 
+### Kernel override retired — nixos-26.05 upgrade (2026-08-14)
+
+Bumped flake to `nixos-26.05` + home-manager `release-26.05`. 26.05 ships `linuxPackages_6_18` at **6.18.44** ≥ 6.18.33, so the BT fix `e3ac0d9f1a20` is now in the channel kernel. Deleted the Attempt-4b src-override block from `configuration.nix`; now `boot.kernelPackages = pkgs.linuxPackages_6_18;` — precompiled from cache.nixos.org, no more local kernel compile. Dry-build confirmed `linux-6.18.44` comes from cache and the nvidia stable module evaluates against it. Migration fallout: `services.asusd.enableUserService` removed in 26.05, dropped from `g14.nix`.
+
 ## Notes
 - `powerManagement.resumeCommands` Vfio→Integrated bounce in `devices/g14/g14.nix` is load-bearing per its comment ("G14 wakes from suspend with the dGPU re-attached"). Don't touch.
 - Reference threads if more ammo needed: Ubuntu LP #2024774, drm/amd issue #2227, Arch BBS 298760, Framework community thread on 780M amdgpu issues.
