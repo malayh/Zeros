@@ -106,9 +106,27 @@
     }];
   }];
 
+  # CPU undervolt: Curve Optimizer -15 on all cores (0xFFFFFFF1 = -15 as u32).
+  # Volatile SMU setting, not firmware: any reboot/power-cycle clears it, and
+  # booting a previous generation drops this unit entirely. Reapplied after
+  # suspend/hibernate because resume can reset the SMU state.
+  boot.extraModulePackages = [ config.boot.kernelPackages.ryzen-smu ];
+  boot.kernelModules = [ "ryzen_smu" ];
+
+  systemd.services.cpu-undervolt = {
+    description = "Apply Curve Optimizer undervolt via ryzenadj";
+    wantedBy = [ "multi-user.target" "post-resume.target" ];
+    after = [ "post-resume.target" ];
+    serviceConfig = {
+      Type = "oneshot";
+      ExecStart = "${pkgs.ryzenadj}/bin/ryzenadj --set-coall=0xFFFFFFF1";
+    };
+  };
+
   environment.systemPackages = with pkgs; [
     asusctl
     supergfxctl
+    ryzenadj
   ];
 
   home-manager.users.malay = { config, ... }: {
