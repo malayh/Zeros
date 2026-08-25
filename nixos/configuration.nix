@@ -110,7 +110,11 @@ in
   virtualisation.docker.enable = true;
   virtualisation.libvirtd.enable = true;
   virtualisation.virtualbox.host.enable = true;
-  services.udisks2.enable = true;
+  services.udisks2 = {
+    enable = true;
+    # kernel ntfs3 fails (fsconfig ENOENT) on this kernel; use ntfs-3g (FUSE) first
+    settings."mount_options.conf".defaults.ntfs_drivers = "ntfs,ntfs3";
+  };
   programs.nix-ld.enable = true;
 
   # --- Fonts ---
