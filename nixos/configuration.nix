@@ -116,6 +116,10 @@ in
     settings."mount_options.conf".defaults.ntfs_drivers = "ntfs,ntfs3";
   };
   programs.nix-ld.enable = true;
+  programs.appimage = {
+    enable = true;
+    binfmt = true;
+  };
 
   # --- Fonts ---
   fonts.packages = with pkgs; [
