@@ -228,6 +228,34 @@ Drop everything in one toggle. The risk is small ("might lose a `/usr/bin/foo` s
 
 Bumped flake to `nixos-26.05` + home-manager `release-26.05`. 26.05 ships `linuxPackages_6_18` at **6.18.44** ≥ 6.18.33, so the BT fix `e3ac0d9f1a20` is now in the channel kernel. Deleted the Attempt-4b src-override block from `configuration.nix`; now `boot.kernelPackages = pkgs.linuxPackages_6_18;` — precompiled from cache.nixos.org, no more local kernel compile. Dry-build confirmed `linux-6.18.44` comes from cache and the nvidia stable module evaluates against it. Migration fallout: `services.asusd.enableUserService` removed in 26.05, dropped from `g14.nix`.
 
+## New symptom class — no-POST power failure (2026-09-01/02)
+
+Separate from the freeze saga above. Machine would not reach BIOS: press power → keyboard backlight flashes ~1s → powers back off. No display, no POST.
+
+Timeline:
+- Aug 31 23:08 — last good session ended in a **clean user-initiated poweroff** (journal confirms full orderly shutdown). No crash, no hardware errors.
+- ~Sep 1 — no-POST symptom. Tried: 1-min power-button hold; battery disconnect 10 min + AC-only + power-button reset; cleaned RAM contacts. None fixed it immediately.
+- Sep 2 ~19:35 — after sitting untouched ~2 days, powered on normally first try.
+
+Evidence gathered post-recovery (2026-09-02):
+- Kernel log of recovery boot: `PM: RTC time: 00:54:35, date: 2016-01-01` — RTC reset to AMD epoch, confirming full standby-power loss (expected: battery was pulled; G14 has no coin cell, RTC runs off main battery).
+- Zero WHEA/MCE/machine-check lines across all 8 retained boots (Aug 27 → Sep 2).
+- Battery: learned full 57.82 Wh vs 76 Wh design (~24% wear), holds 16.6 V vs 15.9 V min-design, charge cap 85%. Worn but functional.
+- BIOS GA402XZ.318 (2024-04-22), EC firmware 0.49.
+
+Ruled out:
+- **OS/NixOS/kernel** — failure is pre-BIOS; no OS code runs.
+- **CO undervolt (`cpu-undervolt.service`, coall -15)** — volatile SMU state, cleared at power-off; POST happens before it's ever applied. Also no WHEA/MCE errors in 11 days of running with it. (Note: commit says "-10" but 0xFFFFFFF1 = -15.)
+- **Crash-induced corruption** — last shutdown was clean.
+
+Diagnosis (best fit): **EC / USB-C PD controller latch-up.** Keyboard-flash-then-off means the EC starts, begins power-rail sequencing, aborts before SoC handoff. A latched EC state can survive short battery pulls (standby caps hold residual charge); the only thing that "fixed" it was 2 days of full drain. Timeline matches exactly. Second-rank suspect: marginal SO-DIMM memory training (temperature/contact dependent); weak suspect: battery brownout (AC-only attempts also failed, so unlikely).
+
+Prevention / if it recurs:
+1. Proper full EC reset without waiting days: unplug AC **and** disconnect battery, **then** hold power button 60s (drains standby caps through the EC), reconnect, boot. Order matters — power-button hold must happen with all power sources removed.
+2. Check ASUS support for BIOS > 318 for GA402XZ (EC firmware ships inside BIOS updates; only real vector for EC bug fixes).
+3. Avoid leaving USB-C PD chargers/docks attached while shut down — PD controller latch-up is a known ROG failure mode; prefer barrel charger.
+4. If it recurs, treat as degrading mainboard power stage: back up, service while it still boots.
+
 ## Notes
 - `powerManagement.resumeCommands` Vfio→Integrated bounce in `devices/g14/g14.nix` is load-bearing per its comment ("G14 wakes from suspend with the dGPU re-attached"). Don't touch.
 - Reference threads if more ammo needed: Ubuntu LP #2024774, drm/amd issue #2227, Arch BBS 298760, Framework community thread on 780M amdgpu issues.
