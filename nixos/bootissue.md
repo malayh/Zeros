@@ -248,13 +248,27 @@ Ruled out:
 - **CO undervolt (`cpu-undervolt.service`, coall -15)** — volatile SMU state, cleared at power-off; POST happens before it's ever applied. Also no WHEA/MCE errors in 11 days of running with it. (Note: commit says "-10" but 0xFFFFFFF1 = -15.)
 - **Crash-induced corruption** — last shutdown was clean.
 
+**Prior episode (~2026-08-18, reported 2026-09-02):** same no-POST symptom a couple weeks earlier. Resolved by leaving it on the charger 5–6 hours — no resets, no battery pull. First occurrence, predates nothing relevant in config (undervolt commit landed Aug 20, around the same time — but undervolt is volatile/post-boot, mechanism ruled out; timing coincidence).
+
+**Recovery-boot journal shows:** battery at 100% (of 85 cap) and ADP0 off-line — the machine recovered on battery power with a full battery. So in episode 2 the battery never drained while off; charge state was not the variable. Episode 1's charge-based recovery vs episode 2's time-based recovery means neither "drained battery" nor "standby-cap drain" alone explains both.
+
 Diagnosis (best fit): **EC / USB-C PD controller latch-up.** Keyboard-flash-then-off means the EC starts, begins power-rail sequencing, aborts before SoC handoff. A latched EC state can survive short battery pulls (standby caps hold residual charge); the only thing that "fixed" it was 2 days of full drain. Timeline matches exactly. Second-rank suspect: marginal SO-DIMM memory training (temperature/contact dependent); weak suspect: battery brownout (AC-only attempts also failed, so unlikely).
 
 Prevention / if it recurs:
 1. Proper full EC reset without waiting days: unplug AC **and** disconnect battery, **then** hold power button 60s (drains standby caps through the EC), reconnect, boot. Order matters — power-button hold must happen with all power sources removed.
-2. Check ASUS support for BIOS > 318 for GA402XZ (EC firmware ships inside BIOS updates; only real vector for EC bug fixes).
+2. ~~Check ASUS support for BIOS > 318~~ — user confirmed 318 is the latest for GA402XZ (2026-09-02). No firmware-update lever available.
 3. Avoid leaving USB-C PD chargers/docks attached while shut down — PD controller latch-up is a known ROG failure mode; prefer barrel charger.
-4. If it recurs, treat as degrading mainboard power stage: back up, service while it still boots.
+4. **Two episodes in ~2 weeks = trend, not fluke.** Treat as a degrading EC/power-delivery path on the mainboard. Back up now; plan board-level service. Next episode: try in order (a) charge 6h plugged in, (b) full drain reset (AC+battery out, then 60s power hold), (c) note which one worked — it discriminates battery-side vs EC-side.
+5. Tattletale for next recovery boot: check kernel log for `RTC time ... 2016-01-01` WITHOUT having pulled the battery — that would prove the EC lost standby power internally (brownout), pinning it to the board.
+
+### Post-recovery burn-in (2026-09-02)
+
+Ran from the booted system, on AC:
+- **stress-ng 4 min** (16 cpu + 2 cache + 2 matrix workers): 20/20 passed, sustained ~4.2 GHz all-core pinned at 95°C Tctl (normal G14 throttle target), no clock collapse. Zero MCE/WHEA/kernel warnings during the run → **-15 CO undervolt stable under full load**.
+- **memtester 8G, 1 full pass** (userspace, unlocked pages): all 16 pattern tests ok → no gross RAM fault; DIMM present (spd5118 sensor, peaked 57.8°C under load). Full coverage needs boot-time memtest86+.
+- **NVMe** (Samsung PM9A1, fw GXA7301Q, state live): direct-I/O 2 GiB write 3.6 GB/s / read 4.2 GB/s, drive at 45.8°C after. Healthy. SMART read still pending (needs root).
+
+Nothing testable from userspace is faulty — consistent with the EC-latch-up diagnosis (pre-POST domain, not reachable from a booted OS).
 
 ## Notes
 - `powerManagement.resumeCommands` Vfio→Integrated bounce in `devices/g14/g14.nix` is load-bearing per its comment ("G14 wakes from suspend with the dGPU re-attached"). Don't touch.

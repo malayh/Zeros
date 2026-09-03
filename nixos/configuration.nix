@@ -151,6 +151,7 @@ in
     wget
     git
     glib
+    distrobox
     sddm-theme-zeros
   ];
 
