@@ -1,0 +1,3 @@
+# Pi runtime state (keep .pi/agents/ for shared config)
+.pi/*
+!.pi/agents/

@@ -1,0 +1,20 @@
+{
+  "packages": [
+    "npm:@ff-labs/pi-fff",
+    "npm:@juicesharp/rpiv-ask-user-question",
+    "npm:@juicesharp/rpiv-todo",
+    "npm:@narumitw/pi-goal",
+    "npm:@quintinshaw/pi-dynamic-workflows",
+    "git:github.com/DietrichGebert/ponytail",
+    "npm:pi-ask-user",
+    "npm:pi-btw",
+    "npm:pi-context-view",
+    "npm:pi-mcp-adapter",
+    "npm:pi-mermaid",
+    "npm:pi-subagents",
+    "npm:taskplane",
+    "npm:@plannotator/pi-extension"
+  ],
+  "lastChangelogVersion": "0.85.1",
+  "theme": "dark"
+}

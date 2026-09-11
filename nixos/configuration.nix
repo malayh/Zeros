@@ -115,7 +115,33 @@ in
     # kernel ntfs3 fails (fsconfig ENOENT) on this kernel; use ntfs-3g (FUSE) first
     settings."mount_options.conf".defaults.ntfs_drivers = "ntfs,ntfs3";
   };
-  programs.nix-ld.enable = true;
+  programs.nix-ld = {
+    enable = true;
+    libraries = with pkgs; [
+      # Keep the nix-ld defaults and add TONE3000's runtime dependencies.
+      zlib
+      zstd
+      stdenv.cc.cc
+      curl
+      openssl
+      attr
+      libssh
+      bzip2
+      libxml2
+      acl
+      libsodium
+      util-linux
+      xz
+      systemd
+      webkitgtk_4_1
+      libsoup_3
+      gtk3
+      alsa-lib
+      freetype
+      fontconfig
+      libx11
+    ];
+  };
   programs.appimage = {
     enable = true;
     binfmt = true;
