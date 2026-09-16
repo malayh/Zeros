@@ -1,3 +1,0 @@
-export TERMINAL=xdg-terminal-exec
-export CUSTOM_SCRIPS_PATH=$HOME/.config/scripts
-export PATH=$CUSTOM_SCRIPS_PATH:$PATH
