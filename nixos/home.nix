@@ -30,6 +30,7 @@
 
     # bar / notifications / launchers
     waybar
+    quickshell
     swaynotificationcenter
     rofi
     wofi
@@ -135,7 +136,7 @@
     repoLink = name:
       config.lib.file.mkOutOfStoreSymlink "${flakeRoot}/config/${name}";
   in lib.genAttrs
-    [ "hypr" "waybar" "rofi" "swaync" "scripts" "uwsm" ]
+    [ "hypr" "waybar" "quickshell" "rofi" "swaync" "scripts" "uwsm" ]
     (name: { source = repoLink name; });
 
   home.file.".bashrc".source =

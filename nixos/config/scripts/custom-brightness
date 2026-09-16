@@ -1,0 +1,185 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+die() {
+    printf 'custom-brightness: %s\n' "$*" >&2
+    exit 1
+}
+
+is_uint() {
+    [[ "$1" =~ ^[0-9]+$ ]]
+}
+
+percent() {
+    local current=$1 maximum=$2
+    (( maximum > 0 )) || { printf '0\n'; return; }
+    printf '%d\n' "$(( (current * 100 + maximum / 2) / maximum ))"
+}
+
+# Output: connector<TAB>i2c-bus<TAB>model
+parse_ddc_detect() {
+    awk '
+        function flush() {
+            if (connector != "" && bus != "") print connector "\t" bus "\t" model
+        }
+        /^Display [0-9]+/ {
+            flush()
+            connector = bus = model = ""
+            next
+        }
+        /^[[:space:]]*I2C bus:/ {
+            bus = $0
+            sub(/^.*\/dev\/i2c-/, "", bus)
+            sub(/[[:space:]].*$/, "", bus)
+            next
+        }
+        /^[[:space:]]*DRM connector:/ {
+            connector = $0
+            sub(/^.*DRM connector:[[:space:]]*/, "", connector)
+            sub(/^card[0-9]+-/, "", connector)
+            sub(/[[:space:]].*$/, "", connector)
+            next
+        }
+        /^[[:space:]]*Model:/ {
+            model = $0
+            sub(/^.*Model:[[:space:]]*/, "", model)
+            next
+        }
+        END { flush() }
+    '
+}
+
+# Output: current<TAB>maximum
+parse_vcp() {
+    awk '$1 == "VCP" && toupper($2) == "10" { print $(NF - 1) "\t" $NF; exit }'
+}
+
+list_monitors() {
+    local monitors_json backlight_line backlight_device backlight_current backlight_max
+    local ddc_output connector bus model values current maximum label value_pct
+    local -a rows=()
+    declare -A ddc_bus=() ddc_model=() ddc_current=() ddc_max=()
+
+    monitors_json=$(hyprctl monitors -j 2>/dev/null) || die 'cannot query Hyprland monitors'
+    jq -e 'type == "array"' >/dev/null <<<"$monitors_json" || die 'invalid Hyprland monitor data'
+
+    backlight_device=''
+    backlight_current=0
+    backlight_max=0
+    backlight_line=$(brightnessctl -m -c backlight 2>/dev/null | head -n 1 || true)
+    if [[ -n "$backlight_line" ]]; then
+        IFS=, read -r backlight_device _ backlight_current _ backlight_max <<<"$backlight_line"
+        if ! is_uint "$backlight_current" || ! is_uint "$backlight_max"; then
+            backlight_device=''
+        fi
+    fi
+
+    ddc_output=$(ddcutil detect --brief 2>/dev/null || true)
+    while IFS=$'\t' read -r connector bus model; do
+        [[ -n "$connector" && -n "$bus" ]] || continue
+        ddc_bus["$connector"]=$bus
+        ddc_model["$connector"]=$model
+        values=$(ddcutil --bus="$bus" getvcp 10 --terse 2>/dev/null | parse_vcp || true)
+        if [[ -n "$values" ]]; then
+            IFS=$'\t' read -r current maximum <<<"$values"
+            if is_uint "$current" && is_uint "$maximum" && (( maximum > 0 )); then
+                ddc_current["$connector"]=$current
+                ddc_max["$connector"]=$maximum
+            fi
+        fi
+    done < <(parse_ddc_detect <<<"$ddc_output")
+
+    while IFS=$'\t' read -r connector label; do
+        [[ -n "$connector" ]] || continue
+        [[ -n "$label" ]] || label=$connector
+
+        if [[ "$connector" == eDP-* || "$connector" == LVDS-* || "$connector" == DSI-* ]]; then
+            if [[ -n "$backlight_device" ]]; then
+                value_pct=$(percent "$backlight_current" "$backlight_max")
+                rows+=("$(jq -cn \
+                    --arg id "$connector" --arg name "$label" --arg connector "$connector" \
+                    --arg backend backlight --arg target "$backlight_device" \
+                    --argjson current "$backlight_current" --argjson maximum "$backlight_max" \
+                    --argjson percent "$value_pct" \
+                    '{id:$id,name:$name,connector:$connector,backend:$backend,target:$target,current:$current,maximum:$maximum,percent:$percent,available:true,error:null}')")
+            else
+                rows+=("$(jq -cn --arg id "$connector" --arg name "$label" --arg connector "$connector" \
+                    '{id:$id,name:$name,connector:$connector,backend:null,target:null,current:null,maximum:null,percent:null,available:false,error:"Backlight control unavailable"}')")
+            fi
+        elif [[ -n "${ddc_bus[$connector]:-}" && -n "${ddc_current[$connector]:-}" ]]; then
+            bus=${ddc_bus[$connector]}
+            current=${ddc_current[$connector]}
+            maximum=${ddc_max[$connector]}
+            model=${ddc_model[$connector]:-}
+            [[ -n "$model" ]] && label="$model ($connector)"
+            value_pct=$(percent "$current" "$maximum")
+            rows+=("$(jq -cn \
+                --arg id "$connector" --arg name "$label" --arg connector "$connector" \
+                --arg backend ddc --arg target "$bus" \
+                --argjson current "$current" --argjson maximum "$maximum" \
+                --argjson percent "$value_pct" \
+                '{id:$id,name:$name,connector:$connector,backend:$backend,target:$target,current:$current,maximum:$maximum,percent:$percent,available:true,error:null}')")
+        else
+            rows+=("$(jq -cn --arg id "$connector" --arg name "$label" --arg connector "$connector" \
+                '{id:$id,name:$name,connector:$connector,backend:null,target:null,current:null,maximum:null,percent:null,available:false,error:"DDC/CI unavailable"}')")
+        fi
+    done < <(jq -r '.[] | [.name, (.description // .model // .name)] | @tsv' <<<"$monitors_json")
+
+    if (( ${#rows[@]} == 0 )); then
+        printf '[]\n'
+    else
+        printf '%s\n' "${rows[@]}" | jq -s '.'
+    fi
+}
+
+set_brightness() {
+    (( $# == 4 )) || die 'usage: custom-brightness set <backlight|ddc> <target> <value> <maximum>'
+    local backend=$1 target=$2 value=$3 maximum=$4 actual_max
+
+    is_uint "$value" && is_uint "$maximum" && (( maximum > 0 && value <= maximum )) \
+        || die 'brightness value is outside the valid range'
+
+    case "$backend" in
+        backlight)
+            [[ "$target" =~ ^[A-Za-z0-9_.:-]+$ ]] || die 'invalid backlight device'
+            actual_max=$(brightnessctl -d "$target" max 2>/dev/null) || die 'backlight device unavailable'
+            is_uint "$actual_max" && (( actual_max == maximum )) || die 'backlight range changed; reopen the panel'
+            brightnessctl -q -d "$target" set "$value" || die 'failed to set internal brightness'
+            ;;
+        ddc)
+            is_uint "$target" || die 'invalid I2C bus'
+            ddcutil --bus="$target" --noverify setvcp 10 "$value" >/dev/null \
+                || die 'failed to set external brightness'
+            ;;
+        *) die 'unknown brightness backend' ;;
+    esac
+}
+
+self_test() {
+    local parsed vcp
+    parsed=$(parse_ddc_detect <<'EOF'
+Display 1
+   I2C bus:  /dev/i2c-6
+   DRM connector:           card1-DP-2
+   EDID synopsis:
+      Mfg id:               DEL
+      Model:                DELL U2723QE
+
+Display 2
+   I2C bus:  /dev/i2c-8
+   DRM connector:           card1-HDMI-A-1
+EOF
+)
+    [[ "$parsed" == $'DP-2\t6\tDELL U2723QE\nHDMI-A-1\t8\t' ]] || die 'DDC detection parser self-test failed'
+    vcp=$(parse_vcp <<<'VCP 10 C 40 100')
+    [[ "$vcp" == $'40\t100' ]] || die 'VCP parser self-test failed'
+    [[ "$(percent 40 80)" == 50 ]] || die 'percentage self-test failed'
+    printf 'custom-brightness self-test passed\n'
+}
+
+case "${1:-}" in
+    list) (( $# == 1 )) || die 'usage: custom-brightness list'; list_monitors ;;
+    set) shift; set_brightness "$@" ;;
+    self-test) (( $# == 1 )) || die 'usage: custom-brightness self-test'; self_test ;;
+    *) die 'usage: custom-brightness <list|set|self-test>' ;;
+esac

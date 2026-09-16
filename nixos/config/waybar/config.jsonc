@@ -13,6 +13,7 @@
     "pulseaudio",
     "cpu",
     "battery",
+    "custom/brightness",
     "custom/temperature"
   ],
   "hyprland/workspaces": {
@@ -50,6 +51,11 @@
     "return-type": "json",
     "interval": 5,
     "format": "󰔏 {}"
+  },
+  "custom/brightness": {
+    "format": "󰃠",
+    "tooltip-format": "Display brightness",
+    "on-click": "quickshell -c control-center ipc call controlCenter toggle"
   },
   // Waybar's built-in clock uses C++20 chrono specs, which lack unpadded-hour
   // (`%-I`) and space-padded-hour (`%l`).  Shelling out to GNU `date` gives us
