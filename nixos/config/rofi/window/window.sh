@@ -4,6 +4,8 @@ source ~/.config/rofi/common/generic.sh
 
 IFS=: read -r -a xdg_data_paths <<< "${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
 declare -a icon_paths application_paths desktop_files
+desktop_files_loaded=false
+icon_cache_file="${XDG_CACHE_HOME:-$HOME/.cache}/rofi/window-icons.tsv"
 
 for data_path in "${xdg_data_paths[@]}"; do
     [[ -d $data_path/icons ]] && icon_paths+=("$data_path/icons")
@@ -11,10 +13,14 @@ for data_path in "${xdg_data_paths[@]}"; do
     [[ -d $data_path/applications ]] && application_paths+=("$data_path/applications")
 done
 
-if (( ${#application_paths[@]} )); then
+load_desktop_files() {
+    [[ $desktop_files_loaded == true ]] && return
+    desktop_files_loaded=true
+
+    (( ${#application_paths[@]} )) || return
     mapfile -d '' -t desktop_files < <(find -L "${application_paths[@]}" \
         -maxdepth 1 -type f -name '*.desktop' -print0 2>/dev/null)
-fi
+}
 
 find_icon_file() {
     local name=$1 icon
@@ -69,6 +75,13 @@ resolve_app_icon() {
     fi
 }
 
+cache_app_icon() {
+    local app=$1 icon=$2 cache_dir=${icon_cache_file%/*}
+
+    mkdir -p -- "$cache_dir" 2>/dev/null || return 0
+    printf '%s\t%s\n' "$app" "$icon" 2>/dev/null >> "$icon_cache_file" || true
+}
+
 clients=$(hyprctl clients -j 2>/dev/null) || exit 0
 clients=$(jq -c '
     [
@@ -92,8 +105,20 @@ clients=$(jq -c '
 declare -A app_icons
 options=""
 
+if [[ -r $icon_cache_file ]]; then
+    while IFS=$'\t' read -r cached_app cached_icon; do
+        [[ -n $cached_app && -n $cached_icon ]] || continue
+        [[ $cached_icon != /* || -f $cached_icon ]] || continue
+        app_icons[$cached_app]=$cached_icon
+    done < "$icon_cache_file"
+fi
+
 while IFS=$'\x1f' read -r title workspace app; do
-    [[ ${app_icons[$app]+cached} ]] || app_icons[$app]=$(resolve_app_icon "$app")
+    if [[ ! ${app_icons[$app]+cached} ]]; then
+        load_desktop_files
+        app_icons[$app]=$(resolve_app_icon "$app")
+        cache_app_icon "$app" "${app_icons[$app]}"
+    fi
     [[ -n $options ]] && options+=$'\n'
     printf -v row '%s — %s\\0icon\\x1f%s\\x1fmeta\\x1f%s' \
         "$title" "$workspace" "${app_icons[$app]}" "$app"
