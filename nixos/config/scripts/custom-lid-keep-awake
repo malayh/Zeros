@@ -1,0 +1,92 @@
+#!/bin/bash
+set -euo pipefail
+
+unit=custom-lid-keep-awake.service
+# The inhibited child loses NOTIFY_SOCKET; pass it explicitly for readiness.
+# This service-only action must run before taking the transition lock.
+if [[ ${1:-} == hold ]]; then
+    exec systemd-inhibit \
+        --what=handle-lid-switch:sleep --mode=block \
+        --who='Lid Keep-Awake' --why='Keep background work running with the lid closed' \
+        "$(command -v bash)" -c 'NOTIFY_SOCKET="$1" "$2" --ready && exec "$3" infinity' \
+        bash "${NOTIFY_SOCKET:?}" "$(command -v systemd-notify)" "$(command -v sleep)"
+fi
+
+# Serialize menu actions, lid events, and idle callbacks.
+exec 9>"${XDG_RUNTIME_DIR:?}/custom-lid-keep-awake.lock"
+flock -x 9
+
+active() {
+    systemctl --user is-active --quiet "$unit"
+}
+
+lid_closed() {
+    grep -qsE 'state:[[:space:]]+closed' /proc/acpi/button/lid/*/state
+}
+
+disable() {
+    if active; then
+        systemctl --user stop "$unit"
+    fi
+}
+
+lock_and_blank() {
+    # Hyprlock runs in the background; it must not inherit our flock.
+    custom-lock-screen 9>&-
+    hyprctl dispatch dpms off
+}
+
+enable() {
+    active && return 0
+    # Readiness is sent only after systemd-inhibit holds the actual locks.
+    if ! systemd-run --user --quiet --collect --unit="$unit" \
+        --property=Type=notify --property=NotifyAccess=all \
+        --property=PartOf=graphical-session.target \
+        --property=TimeoutStartSec=10s --property=TimeoutStopSec=5s \
+        "$(command -v bash)" "$(readlink -f "$0")" hold; then
+        echo 'Lid Keep-Awake failed: could not prevent sleep. The mode is off.' >&2
+        busctl --user call org.freedesktop.Notifications /org/freedesktop/Notifications \
+            org.freedesktop.Notifications Notify susssasa{sv}i \
+            'Lid Keep-Awake' 0 '' 'Lid Keep-Awake failed' \
+            'Could not prevent sleep. The mode is off.' 0 0 -1 >/dev/null || true
+        return 1
+    fi
+    if lid_closed; then
+        lock_and_blank
+    fi
+}
+
+case "${1:-}" in
+    enable) enable ;;
+    disable) disable ;;
+    toggle)
+        if active; then disable; else enable; fi
+        ;;
+    status) active ;;
+    close)
+        if active; then
+            lock_and_blank
+        else
+            hyprctl keyword monitor 'eDP-1,disable'
+        fi
+        ;;
+    open)
+        # Restore displays before releasing the lid inhibitor.
+        result=0
+        hyprctl reload || result=$?
+        hyprctl dispatch dpms on || result=$?
+        disable
+        exit "$result"
+        ;;
+    resume-display)
+        if active && lid_closed; then
+            exit 0
+        fi
+        hyprctl dispatch dpms on
+        brightnessctl -r
+        ;;
+    *)
+        echo 'Usage: custom-lid-keep-awake {enable|disable|toggle|status|close|open|resume-display}' >&2
+        exit 2
+        ;;
+esac

@@ -11,6 +11,10 @@ suspend=' Suspend'
 hibernate=' Hibernate'
 reboot=' Reboot'
 lock=' Lock'
+keep_awake='󰒲 Lid Keep-Awake: Off'
+if custom-lid-keep-awake status; then
+	keep_awake='󰒲 Lid Keep-Awake: On'
+fi
 
 yes=' Yes'
 no='󰜺 Cancel'
@@ -29,9 +33,11 @@ run_cmd() {
 		elif [[ $1 == '--lock' ]]; then
 			custom-lock-screen
 		elif [[ $1 == '--suspend' ]]; then
+			custom-lid-keep-awake disable || return
 			custom-lock-screen
 			systemctl suspend
 		elif [[ $1 == '--hibernate' ]]; then
+			custom-lid-keep-awake disable || return
 			custom-lock-screen
 			systemctl hibernate
 		fi
@@ -40,10 +46,13 @@ run_cmd() {
 	fi
 }
 
-options=$(echo -e "$lock\n$suspend\n$hibernate\n$reboot\n$shutdown")
+options=$(echo -e "$lock\n$suspend\n$hibernate\n$keep_awake\n$reboot\n$shutdown")
 chosen="$(_runrofimenu "$options" "Power Menu" "")"
 
 case ${chosen} in
+    "$keep_awake")
+		custom-lid-keep-awake toggle
+		;;
     $shutdown)
 		run_cmd --shutdown
         ;;
