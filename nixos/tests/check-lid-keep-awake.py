@@ -13,31 +13,36 @@ SCRIPT = ROOT / "config/scripts/custom-lid-keep-awake"
 CLAMSHELL = ROOT / "config/scripts/custom-activate-clamshell"
 MENU = ROOT / "config/rofi/powermenu/power.sh"
 UNIT = "custom-lid-keep-awake.service"
+CLAMSHELL_UNIT = "custom-clamshell.service"
 
 MOCK = r'''
 import json, os, pathlib, subprocess, sys
 name = pathlib.Path(sys.argv[0]).name
 args = sys.argv[1:]
 root = pathlib.Path(os.environ['CHECK_DIR'])
-state = root / 'active'
+def unit_state(unit):
+    assert unit in ('custom-lid-keep-awake.service', 'custom-clamshell.service')
+    return root / unit
 with (root / 'log').open('a') as f:
     f.write(json.dumps([name, *args]) + '\n')
 if name == 'systemctl':
     if 'is-active' in args:
-        sys.exit(0 if state.exists() else 3)
+        sys.exit(0 if unit_state(args[-1]).exists() else 3)
     if 'stop' in args:
-        assert args == ['--user', 'stop', 'custom-lid-keep-awake.service']
+        assert args[:2] == ['--user', 'stop']
         if os.environ.get('FAIL_STOP'): sys.exit(1)
-        state.unlink(missing_ok=True)
+        unit_state(args[-1]).unlink(missing_ok=True)
 elif name == 'systemd-run':
     assert '--property=Type=notify' in args
     assert '--property=NotifyAccess=all' in args
     assert '--property=PartOf=graphical-session.target' in args
-    assert args[-1] == 'hold'
+    unit = next(arg.removeprefix('--unit=') for arg in args if arg.startswith('--unit='))
+    assert args[-1] == ('hold-clamshell' if unit == 'custom-clamshell.service' else 'hold')
     if os.environ.get('FAIL_ENABLE'): sys.exit(1)
-    state.touch()
+    unit_state(unit).touch()
 elif name == 'systemd-inhibit':
-    assert '--what=handle-lid-switch:sleep' in args and '--mode=block' in args
+    what = '--what=handle-lid-switch' if '--who=Clamshell' in args else '--what=handle-lid-switch:sleep'
+    assert what in args and '--mode=block' in args
     environment = dict(os.environ)
     environment.pop('NOTIFY_SOCKET', None)
     sys.exit(subprocess.run(args[4:], env=environment).returncode)
@@ -50,8 +55,12 @@ elif name == 'custom-lock-screen':
     else: raise AssertionError('Background lock process inherited the transition lock')
 elif name == 'grep':
     sys.exit(0 if os.environ.get('LID_CLOSED') else 1)
-elif name == 'hyprctl' and os.environ.get('FAIL_DISPLAY'):
-    sys.exit(1)
+elif name == 'hyprctl':
+    if args == ['-j', 'monitors', 'all']:
+        if os.environ.get('FAIL_MONITORS'): sys.exit(1)
+        print(os.environ.get('MONITORS', '[]'))
+    elif os.environ.get('FAIL_DISPLAY'):
+        sys.exit(1)
 elif name == 'rofi':
     rows = sys.stdin.read().splitlines()
     prompt = args[args.index('-p') + 1]
@@ -90,13 +99,16 @@ with tempfile.TemporaryDirectory(prefix="check-lid-") as temporary:
         return [json.loads(line) for line in logfile.read_text().splitlines()]
 
     def meaningful(calls):
-        return [call for call in calls if call[0] not in ("systemctl", "grep")]
+        return [call for call in calls if call[0] not in ("systemctl", "grep")
+                and call != ["hyprctl", "-j", "monitors", "all"]]
 
     calls = run('hold', NOTIFY_SOCKET='check-notify-socket')
     assert ["systemd-notify", "--ready"] in calls
     assert calls[-1] == ["sleep", "infinity"]
+    run('hold-clamshell', NOTIFY_SOCKET='check-notify-socket')
     run("status", expected=3)
-    assert meaningful(run("close", script=CLAMSHELL)) == [["hyprctl", "keyword", "monitor", "eDP-1,disable"]]
+    assert not meaningful(run("close", script=CLAMSHELL))  # Ignore stale lid events.
+    assert meaningful(run("close", script=CLAMSHELL, LID_CLOSED="1")) == [["hyprctl", "keyword", "monitor", "eDP-1,disable"]]
     calls = run("enable", FAIL_ENABLE="1", expected=1)
     assert calls[-1][0] == "busctl"
     run("status", expected=3)
@@ -137,6 +149,49 @@ with tempfile.TemporaryDirectory(prefix="check-lid-") as temporary:
     run("bad-action", expected=2)
     run("bad-action", script=CLAMSHELL, expected=2)
 
+    external = json.dumps([{"name": "eDP-1", "disabled": False},
+                           {"name": "DP-2", "disabled": False}])
+    for monitors in ('[]', '[{"name":"eDP-1"}]',
+                     '[{"name":"DP-2","disabled":true}]', '[{"name":"FALLBACK"}]'):
+        calls = run("close", LID_CLOSED="1", MONITORS=monitors)
+        assert not any(call[0] == "systemd-run" for call in calls)
+    for options, expected in (({"FAIL_MONITORS": "1"}, 1), ({"MONITORS": "invalid"}, 5),
+                              ({"MONITORS": "{}"}, 5),
+                              ({"MONITORS": external, "FAIL_ENABLE": "1"}, 1)):
+        calls = run("close", LID_CLOSED="1", expected=expected, **options)
+        assert ["hyprctl", "keyword", "monitor", "eDP-1,disable"] not in calls
+        assert not (directory / CLAMSHELL_UNIT).exists()
+
+    calls = run("close", script=CLAMSHELL, LID_CLOSED="1", MONITORS=external)
+    start = next(i for i, call in enumerate(calls) if call[0] == "systemd-run")
+    assert start < calls.index(["hyprctl", "keyword", "monitor", "eDP-1,disable"])
+    assert not any(call[0] == "custom-lock-screen" or "dpms" in call for call in calls)
+    assert (directory / CLAMSHELL_UNIT).exists()
+    run("status", expected=3)  # Automatic clamshell isn't manual Keep-Awake.
+    calls = run("close", LID_CLOSED="1", MONITORS='[]')  # Monitor/power loss.
+    assert not any(call[0] == "systemd-run" for call in calls)
+    assert (directory / CLAMSHELL_UNIT).exists()
+    assert meaningful(run("resume-display", LID_CLOSED="1")) == [
+        ["hyprctl", "dispatch", "dpms", "on"], ["brightnessctl", "-r"]]
+    run("enable")
+    run("toggle")
+    assert (directory / CLAMSHELL_UNIT).exists()  # Manual toggle doesn't release clamshell.
+    calls = run("open", script=CLAMSHELL)
+    assert calls.index(["hyprctl", "dispatch", "dpms", "on"]) < calls.index(
+        ["systemctl", "--user", "stop", CLAMSHELL_UNIT])
+    assert not (directory / CLAMSHELL_UNIT).exists()
+
+    for action in ("Suspend", "Hibernate"):
+        run("close", LID_CLOSED="1", MONITORS=external)
+        run("enable")
+        run(script=MENU, MENU_ACTION=action, CONFIRM="Cancel")
+        assert (directory / CLAMSHELL_UNIT).exists() and (directory / UNIT).exists()
+        calls = run(script=MENU, MENU_ACTION=action)
+        sleep = calls.index(["systemctl", action.lower()])
+        assert calls.index(["systemctl", "--user", "stop", CLAMSHELL_UNIT]) < sleep
+        assert calls.index(["systemctl", "--user", "stop", UNIT]) < sleep
+        assert not (directory / CLAMSHELL_UNIT).exists() and not (directory / UNIT).exists()
+
     logfile.write_text("")
     commands = [subprocess.Popen(["bash", str(SCRIPT), "enable"], env=environment)
                 for _ in range(4)]
@@ -146,4 +201,4 @@ with tempfile.TemporaryDirectory(prefix="check-lid-") as temporary:
     run("open")
     run("status", expected=3)
 
-print("Lid Keep-Awake checks passed (lid handling, idle resume, power menu, failures, concurrent enables).")
+print("Lid Keep-Awake and clamshell checks passed (outage retention, reopening, manual mode, power menu, failures, concurrency).")
