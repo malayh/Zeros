@@ -59,6 +59,7 @@
     # apps
     ghostty
     nautilus
+    (pkgs.callPackage ./packages/strata.nix { })
     libreoffice
     chromium
     brave
