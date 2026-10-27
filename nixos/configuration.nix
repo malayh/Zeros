@@ -170,6 +170,8 @@ in
     packages = with pkgs; [ ];
   };
 
+  services.tailscale.enable = true;
+
   programs.firefox.enable = true;
   nixpkgs.config.allowUnfree = true;
   environment.systemPackages = with pkgs; [
